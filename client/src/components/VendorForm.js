@@ -116,10 +116,20 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
       }
     } catch (error) {
       console.error('Error saving vendor:', error);
-      setMessage({ 
-        type: 'error', 
-        text: error.response?.data?.error || error.response?.data?.details || 'Error saving vendor details. Please try again.' 
-      });
+      // Check for duplicate vendor error (409 Conflict)
+      if (error.response?.status === 409) {
+        const duplicateMessage = error.response?.data?.message || 
+          `A vendor with the name "${formData.name}" and transport name "${formData.transport_name}" already exists.`;
+        setMessage({ 
+          type: 'error', 
+          text: duplicateMessage
+        });
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: error.response?.data?.error || error.response?.data?.details || error.response?.data?.message || 'Error saving vendor details. Please try again.' 
+        });
+      }
     } finally {
       setLoading(false);
     }

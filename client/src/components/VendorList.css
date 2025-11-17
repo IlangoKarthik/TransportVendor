@@ -21,6 +21,12 @@
   flex-shrink: 0;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .list-header h2 {
   margin: 0;
   color: #333;
@@ -38,6 +44,10 @@
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-add-new:hover {
@@ -46,6 +56,32 @@
 }
 
 .btn-add-new:active {
+  transform: translateY(0);
+}
+
+.btn-import-excel {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(40, 167, 69, 0.2);
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-import-excel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-import-excel:active {
   transform: translateY(0);
 }
 
@@ -282,7 +318,13 @@
     font-size: 24px;
   }
 
-  .btn-add-new {
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .btn-add-new,
+  .btn-import-excel {
     width: 100%;
   }
 
