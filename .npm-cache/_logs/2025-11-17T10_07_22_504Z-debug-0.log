@@ -1,0 +1,175 @@
+0 verbose cli /usr/local/bin/node /usr/local/bin/npm
+1 info using npm@11.6.1
+2 info using node@v24.11.0
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/netkathir/Documents/Netkathir/R&D_Samples/transport-vendor-app/.npmrc
+5 silly config load:file:/Users/netkathir/.npmrc
+6 silly config load:file:/usr/local/etc/npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".npm-cache"
+9 verbose logfile logs-max:10 dir:/Users/netkathir/Documents/Netkathir/R&D_Samples/transport-vendor-app/.npm-cache/_logs/2025-11-17T10_07_22_504Z-
+10 verbose logfile /Users/netkathir/Documents/Netkathir/R&D_Samples/transport-vendor-app/.npm-cache/_logs/2025-11-17T10_07_22_504Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:2348810240 maxSize:587202560 maxEntrySize:293601280
+13 silly idealTree buildDeps
+14 silly reify moves {}
+15 silly audit bulk request {
+15 silly audit   '@babel/runtime': [ '7.28.4' ],
+15 silly audit   'ansi-regex': [ '5.0.1' ],
+15 silly audit   'ansi-styles': [ '4.3.0' ],
+15 silly audit   chalk: [ '4.1.2' ],
+15 silly audit   'supports-color': [ '7.2.0', '8.1.1' ],
+15 silly audit   cliui: [ '8.0.1' ],
+15 silly audit   'color-convert': [ '2.0.1' ],
+15 silly audit   'color-name': [ '1.1.4' ],
+15 silly audit   concurrently: [ '8.2.2' ],
+15 silly audit   'date-fns': [ '2.30.0' ],
+15 silly audit   'emoji-regex': [ '8.0.0' ],
+15 silly audit   escalade: [ '3.2.0' ],
+15 silly audit   'get-caller-file': [ '2.0.5' ],
+15 silly audit   'has-flag': [ '4.0.0' ],
+15 silly audit   'is-fullwidth-code-point': [ '3.0.0' ],
+15 silly audit   lodash: [ '4.17.21' ],
+15 silly audit   'require-directory': [ '2.1.1' ],
+15 silly audit   rxjs: [ '7.8.2' ],
+15 silly audit   'shell-quote': [ '1.8.3' ],
+15 silly audit   'spawn-command': [ '0.0.2' ],
+15 silly audit   'string-width': [ '4.2.3' ],
+15 silly audit   'strip-ansi': [ '6.0.1' ],
+15 silly audit   'tree-kill': [ '1.2.2' ],
+15 silly audit   tslib: [ '2.8.1' ],
+15 silly audit   'wrap-ansi': [ '7.0.0' ],
+15 silly audit   y18n: [ '5.0.8' ],
+15 silly audit   yargs: [ '17.7.2' ],
+15 silly audit   'yargs-parser': [ '21.1.1' ]
+15 silly audit }
+16 http cache yargs-parser@https://registry.npmjs.org/yargs-parser/-/yargs-parser-21.1.1.tgz 0ms (cache hit)
+17 http cache yargs@https://registry.npmjs.org/yargs/-/yargs-17.7.2.tgz 0ms (cache hit)
+18 http cache y18n@https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz 0ms (cache hit)
+19 http cache tslib@https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz 0ms (cache hit)
+20 http cache tree-kill@https://registry.npmjs.org/tree-kill/-/tree-kill-1.2.2.tgz 0ms (cache hit)
+21 http cache supports-color@https://registry.npmjs.org/supports-color/-/supports-color-8.1.1.tgz 0ms (cache hit)
+22 http cache wrap-ansi@https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz 0ms (cache hit)
+23 http cache strip-ansi@https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz 0ms (cache hit)
+24 http cache spawn-command@https://registry.npmjs.org/spawn-command/-/spawn-command-0.0.2.tgz 0ms (cache hit)
+25 http cache string-width@https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz 0ms (cache hit)
+26 http cache shell-quote@https://registry.npmjs.org/shell-quote/-/shell-quote-1.8.3.tgz 1ms (cache hit)
+27 http cache rxjs@https://registry.npmjs.org/rxjs/-/rxjs-7.8.2.tgz 0ms (cache hit)
+28 http cache require-directory@https://registry.npmjs.org/require-directory/-/require-directory-2.1.1.tgz 0ms (cache hit)
+29 http cache lodash@https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz 0ms (cache hit)
+30 http cache is-fullwidth-code-point@https://registry.npmjs.org/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz 0ms (cache hit)
+31 http cache has-flag@https://registry.npmjs.org/has-flag/-/has-flag-4.0.0.tgz 0ms (cache hit)
+32 http cache get-caller-file@https://registry.npmjs.org/get-caller-file/-/get-caller-file-2.0.5.tgz 0ms (cache hit)
+33 http cache escalade@https://registry.npmjs.org/escalade/-/escalade-3.2.0.tgz 0ms (cache hit)
+34 http cache emoji-regex@https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz 0ms (cache hit)
+35 http cache date-fns@https://registry.npmjs.org/date-fns/-/date-fns-2.30.0.tgz 0ms (cache hit)
+36 http cache concurrently@https://registry.npmjs.org/concurrently/-/concurrently-8.2.2.tgz 0ms (cache hit)
+37 http cache color-name@https://registry.npmjs.org/color-name/-/color-name-1.1.4.tgz 0ms (cache hit)
+38 http cache color-convert@https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz 0ms (cache hit)
+39 http cache cliui@https://registry.npmjs.org/cliui/-/cliui-8.0.1.tgz 0ms (cache hit)
+40 http cache chalk@https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz 0ms (cache hit)
+41 http cache ansi-styles@https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz 0ms (cache hit)
+42 http cache ansi-regex@https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz 0ms (cache hit)
+43 http cache @babel/runtime@https://registry.npmjs.org/@babel/runtime/-/runtime-7.28.4.tgz 0ms (cache hit)
+44 http cache supports-color@https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz 0ms (cache hit)
+45 silly tarball no local data for yargs-parser@https://registry.npmjs.org/yargs-parser/-/yargs-parser-21.1.1.tgz. Extracting by manifest.
+46 silly tarball no local data for yargs@https://registry.npmjs.org/yargs/-/yargs-17.7.2.tgz. Extracting by manifest.
+47 silly tarball no local data for y18n@https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz. Extracting by manifest.
+48 silly tarball no local data for tslib@https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz. Extracting by manifest.
+49 silly tarball no local data for tree-kill@https://registry.npmjs.org/tree-kill/-/tree-kill-1.2.2.tgz. Extracting by manifest.
+50 silly tarball no local data for supports-color@https://registry.npmjs.org/supports-color/-/supports-color-8.1.1.tgz. Extracting by manifest.
+51 silly tarball no local data for wrap-ansi@https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz. Extracting by manifest.
+52 silly tarball no local data for strip-ansi@https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz. Extracting by manifest.
+53 silly tarball no local data for spawn-command@https://registry.npmjs.org/spawn-command/-/spawn-command-0.0.2.tgz. Extracting by manifest.
+54 silly tarball no local data for string-width@https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz. Extracting by manifest.
+55 silly tarball no local data for shell-quote@https://registry.npmjs.org/shell-quote/-/shell-quote-1.8.3.tgz. Extracting by manifest.
+56 silly tarball no local data for rxjs@https://registry.npmjs.org/rxjs/-/rxjs-7.8.2.tgz. Extracting by manifest.
+57 silly tarball no local data for require-directory@https://registry.npmjs.org/require-directory/-/require-directory-2.1.1.tgz. Extracting by manifest.
+58 silly tarball no local data for lodash@https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz. Extracting by manifest.
+59 silly tarball no local data for is-fullwidth-code-point@https://registry.npmjs.org/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz. Extracting by manifest.
+60 silly tarball no local data for has-flag@https://registry.npmjs.org/has-flag/-/has-flag-4.0.0.tgz. Extracting by manifest.
+61 silly tarball no local data for get-caller-file@https://registry.npmjs.org/get-caller-file/-/get-caller-file-2.0.5.tgz. Extracting by manifest.
+62 silly tarball no local data for escalade@https://registry.npmjs.org/escalade/-/escalade-3.2.0.tgz. Extracting by manifest.
+63 silly tarball no local data for emoji-regex@https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz. Extracting by manifest.
+64 silly tarball no local data for date-fns@https://registry.npmjs.org/date-fns/-/date-fns-2.30.0.tgz. Extracting by manifest.
+65 silly tarball no local data for concurrently@https://registry.npmjs.org/concurrently/-/concurrently-8.2.2.tgz. Extracting by manifest.
+66 silly tarball no local data for color-name@https://registry.npmjs.org/color-name/-/color-name-1.1.4.tgz. Extracting by manifest.
+67 silly tarball no local data for color-convert@https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz. Extracting by manifest.
+68 silly tarball no local data for cliui@https://registry.npmjs.org/cliui/-/cliui-8.0.1.tgz. Extracting by manifest.
+69 silly tarball no local data for chalk@https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz. Extracting by manifest.
+70 silly tarball no local data for ansi-styles@https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz. Extracting by manifest.
+71 silly tarball no local data for ansi-regex@https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz. Extracting by manifest.
+72 silly tarball no local data for @babel/runtime@https://registry.npmjs.org/@babel/runtime/-/runtime-7.28.4.tgz. Extracting by manifest.
+73 silly tarball no local data for supports-color@https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz. Extracting by manifest.
+74 http fetch GET 200 https://registry.npmjs.org/npm 2325ms
+75 http fetch GET 200 https://registry.npmjs.org/is-fullwidth-code-point/-/is-fullwidth-code-point-3.0.0.tgz 2318ms (cache miss)
+76 http fetch GET 200 https://registry.npmjs.org/has-flag/-/has-flag-4.0.0.tgz 2342ms (cache miss)
+77 http fetch GET 200 https://registry.npmjs.org/get-caller-file/-/get-caller-file-2.0.5.tgz 2377ms (cache miss)
+78 http fetch GET 200 https://registry.npmjs.org/escalade/-/escalade-3.2.0.tgz 2415ms (cache miss)
+79 http fetch GET 200 https://registry.npmjs.org/emoji-regex/-/emoji-regex-8.0.0.tgz 2454ms (cache miss)
+80 http fetch GET 200 https://registry.npmjs.org/color-name/-/color-name-1.1.4.tgz 2576ms (cache miss)
+81 http fetch GET 200 https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz 2596ms (cache miss)
+82 http fetch GET 200 https://registry.npmjs.org/concurrently/-/concurrently-8.2.2.tgz 2595ms (cache miss)
+83 http fetch GET 200 https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz 2606ms (cache miss)
+84 http fetch GET 200 https://registry.npmjs.org/cliui/-/cliui-8.0.1.tgz 2643ms (cache miss)
+85 http fetch GET 200 https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz 2689ms (cache miss)
+86 http fetch GET 200 https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz 2725ms (cache miss)
+87 http fetch GET 200 https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz 2758ms (cache miss)
+88 http fetch GET 200 https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz 2857ms (cache miss)
+89 http fetch GET 200 https://registry.npmjs.org/@babel/runtime/-/runtime-7.28.4.tgz 2956ms (cache miss)
+90 http fetch GET 200 https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz 3406ms (cache miss)
+91 http fetch GET 200 https://registry.npmjs.org/require-directory/-/require-directory-2.1.1.tgz 3480ms (cache miss)
+92 http fetch GET 200 https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz 3485ms (cache miss)
+93 http fetch GET 200 https://registry.npmjs.org/yargs-parser/-/yargs-parser-21.1.1.tgz 3501ms (cache miss)
+94 http fetch GET 200 https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz 3501ms (cache miss)
+95 http fetch GET 200 https://registry.npmjs.org/tree-kill/-/tree-kill-1.2.2.tgz 3539ms (cache miss)
+96 http fetch GET 200 https://registry.npmjs.org/spawn-command/-/spawn-command-0.0.2.tgz 3598ms (cache miss)
+97 http fetch GET 200 https://registry.npmjs.org/supports-color/-/supports-color-8.1.1.tgz 3600ms (cache miss)
+98 http fetch GET 200 https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz 3605ms (cache miss)
+99 http fetch GET 200 https://registry.npmjs.org/shell-quote/-/shell-quote-1.8.3.tgz 3611ms (cache miss)
+100 http fetch GET 200 https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz 3617ms (cache miss)
+101 http fetch GET 200 https://registry.npmjs.org/yargs/-/yargs-17.7.2.tgz 3655ms (cache miss)
+102 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 3705ms
+103 silly audit report {}
+104 http fetch GET 200 https://registry.npmjs.org/rxjs/-/rxjs-7.8.2.tgz 5427ms (cache miss)
+105 http fetch GET 200 https://registry.npmjs.org/date-fns/-/date-fns-2.30.0.tgz 5861ms (cache miss)
+106 silly ADD node_modules/yargs-parser
+107 silly ADD node_modules/yargs
+108 silly ADD node_modules/y18n
+109 silly ADD node_modules/wrap-ansi
+110 silly ADD node_modules/tslib
+111 silly ADD node_modules/tree-kill
+112 silly ADD node_modules/supports-color
+113 silly ADD node_modules/strip-ansi
+114 silly ADD node_modules/string-width
+115 silly ADD node_modules/spawn-command
+116 silly ADD node_modules/shell-quote
+117 silly ADD node_modules/rxjs
+118 silly ADD node_modules/require-directory
+119 silly ADD node_modules/lodash
+120 silly ADD node_modules/is-fullwidth-code-point
+121 silly ADD node_modules/has-flag
+122 silly ADD node_modules/get-caller-file
+123 silly ADD node_modules/escalade
+124 silly ADD node_modules/emoji-regex
+125 silly ADD node_modules/date-fns
+126 silly ADD node_modules/concurrently
+127 silly ADD node_modules/color-name
+128 silly ADD node_modules/color-convert
+129 silly ADD node_modules/cliui
+130 silly ADD node_modules/chalk
+131 silly ADD node_modules/chalk/node_modules/supports-color
+132 silly ADD node_modules/ansi-styles
+133 silly ADD node_modules/ansi-regex
+134 silly ADD node_modules/@babel/runtime
+135 verbose cwd /Users/netkathir/Documents/Netkathir/R&D_Samples/transport-vendor-app
+136 verbose os Darwin 24.6.0
+137 verbose node v24.11.0
+138 verbose npm  v11.6.1
+139 notice
+139 notice New patch version of npm available! 11.6.1 -> 11.6.2
+139 notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.2
+139 notice To update run: npm install -g npm@11.6.2
+139 notice  { force: true, Symbol(proc-log.meta): true }
+140 verbose exit 0
+141 info ok

@@ -1,0 +1,21 @@
+{
+  "name": "transport-vendor-app",
+  "version": "1.0.0",
+  "description": "Full-stack application for transport vendor registration",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && nodemon index.js",
+    "client": "cd client && PORT=3001 npm start",
+    "install-server": "cd server && npm install",
+    "install-client": "cd client && npm install",
+    "install-all": "npm run install-server && npm run install-client"
+  },
+  "keywords": ["react", "express", "mysql", "fullstack"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+

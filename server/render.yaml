@@ -1,0 +1,34 @@
+# Render Blueprint Configuration
+# This file can be used with Render's Blueprint feature for one-click deployment
+
+services:
+  # Backend Service
+  - type: web
+    name: transport-vendor-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DB_HOST
+        sync: false  # Set manually
+      - key: DB_USER
+        sync: false  # Set manually
+      - key: DB_PASSWORD
+        sync: false  # Set manually
+      - key: DB_NAME
+        sync: false  # Set manually
+      - key: ALLOWED_ORIGINS
+        sync: false  # Set manually after frontend deploys
+
+databases:
+  # PostgreSQL Database
+  - name: transport-vendor-db
+    plan: free
+    region: oregon
+
