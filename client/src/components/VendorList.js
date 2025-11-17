@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config';
+import ExcelImport from './ExcelImport';
 import './VendorList.css';
 
 const VendorList = ({ onEdit, onAddNew }) => {
@@ -8,6 +9,7 @@ const VendorList = ({ onEdit, onAddNew }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     fetchVendors();
@@ -56,14 +58,30 @@ const VendorList = ({ onEdit, onAddNew }) => {
     );
   }
 
+  const handleImportSuccess = () => {
+    fetchVendors(); // Refresh the list after import
+  };
+
   return (
     <div className="vendor-list-container">
       <div className="list-header">
         <h2>Vendors List</h2>
-        <button className="btn-add-new" onClick={onAddNew}>
-          + Add New Vendor
-        </button>
+        <div className="header-actions">
+          <button className="btn-import-excel" onClick={() => setShowImportModal(true)}>
+            📊 Import Excel
+          </button>
+          <button className="btn-add-new" onClick={onAddNew}>
+            + Add New Vendor
+          </button>
+        </div>
       </div>
+
+      {showImportModal && (
+        <ExcelImport
+          onImportSuccess={handleImportSuccess}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
 
       {error && <div className="error-message">{error}</div>}
 
