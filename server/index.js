@@ -261,6 +261,20 @@ app.post('/api/vendors', async (req, res) => {
     verification
   } = req.body;
 
+  // Check for duplicate name and transport_name
+  const duplicateCheck = await db.query(
+    'SELECT id, name, transport_name FROM vendors WHERE LOWER(name) = LOWER($1) AND LOWER(transport_name) = LOWER($2)',
+    [name, transport_name]
+  );
+
+  if (duplicateCheck.rows.length > 0) {
+    return res.status(409).json({
+      error: 'Duplicate vendor',
+      message: `A vendor with the name "${name}" and transport name "${transport_name}" already exists.`,
+      existingVendor: duplicateCheck.rows[0]
+    });
+  }
+
   const query = `
     INSERT INTO vendors (
       name, transport_name, visiting_card, owner_broker, vendor_state, vendor_city,
@@ -323,6 +337,20 @@ app.put('/api/vendors/:id', async (req, res) => {
     association_name,
     verification
   } = req.body;
+
+  // Check for duplicate name and transport_name (excluding current record)
+  const duplicateCheck = await db.query(
+    'SELECT id, name, transport_name FROM vendors WHERE LOWER(name) = LOWER($1) AND LOWER(transport_name) = LOWER($2) AND id != $3',
+    [name, transport_name, id]
+  );
+
+  if (duplicateCheck.rows.length > 0) {
+    return res.status(409).json({
+      error: 'Duplicate vendor',
+      message: `A vendor with the name "${name}" and transport name "${transport_name}" already exists.`,
+      existingVendor: duplicateCheck.rows[0]
+    });
+  }
 
   const query = `
     UPDATE vendors SET
@@ -443,6 +471,20 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           errors.push({
             row: rowNum,
             error: `Row ${rowNum}: Name and Transport Name are required`
+          });
+          continue;
+        }
+
+        // Check for duplicate name and transport_name
+        const duplicateCheck = await db.query(
+          'SELECT id, name, transport_name FROM vendors WHERE LOWER(name) = LOWER($1) AND LOWER(transport_name) = LOWER($2)',
+          [vendorData.name, vendorData.transport_name]
+        );
+
+        if (duplicateCheck.rows.length > 0) {
+          errors.push({
+            row: rowNum,
+            error: `Row ${rowNum}: A vendor with name "${vendorData.name}" and transport name "${vendorData.transport_name}" already exists`
           });
           continue;
         }

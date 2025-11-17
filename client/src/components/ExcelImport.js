@@ -62,17 +62,33 @@ const ExcelImport = ({ onImportSuccess, onClose }) => {
       });
 
       setImportResult(response.data);
-      setMessage({ 
-        type: 'success', 
-        text: response.data.message 
-      });
-
-      // Refresh vendor list after successful import
-      if (onImportSuccess) {
-        setTimeout(() => {
+      
+      // Check if there are any errors
+      const hasErrors = response.data.errors && response.data.errors.length > 0;
+      
+      if (hasErrors) {
+        // If there are errors, show error message but keep popup open
+        setMessage({ 
+          type: 'error', 
+          text: response.data.message || `Import completed with ${response.data.errors.length} error(s). Please review the errors below.`
+        });
+        // Refresh vendor list to show any successfully imported vendors
+        if (onImportSuccess && response.data.imported > 0) {
           onImportSuccess();
-          if (onClose) onClose();
-        }, 2000);
+        }
+      } else {
+        // If no errors, show success and close after delay
+        setMessage({ 
+          type: 'success', 
+          text: response.data.message 
+        });
+        // Refresh vendor list after successful import
+        if (onImportSuccess) {
+          setTimeout(() => {
+            onImportSuccess();
+            if (onClose) onClose();
+          }, 2000);
+        }
       }
     } catch (error) {
       console.error('Error importing file:', error);
