@@ -19,7 +19,8 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
     return_service: 'N',
     any_association: 'N',
     association_name: '',
-    verification: ''
+    verification: '',
+    notes: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,8 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
         return_service: response.data.return_service || 'N',
         any_association: response.data.any_association || 'N',
         association_name: response.data.association_name || '',
-        verification: response.data.verification || ''
+        verification: response.data.verification || '',
+        notes: response.data.notes || ''
       });
     } catch (error) {
       console.error('Error fetching vendor:', error);
@@ -104,7 +106,8 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
           return_service: 'N',
           any_association: 'N',
           association_name: '',
-          verification: ''
+          verification: '',
+          notes: ''
         });
       }
       
@@ -338,6 +341,18 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
               value={formData.verification}
               onChange={handleChange}
               placeholder="Enter verification details"
+            />
+          </div>
+
+          <div className="form-group form-group-full-width">
+            <label htmlFor="notes">Notes</label>
+            <textarea
+              id="notes"
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              placeholder="Enter any additional notes or comments"
+              rows="4"
             />
           </div>
         </div>

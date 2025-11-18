@@ -95,6 +95,7 @@ async function createTable() {
       any_association VARCHAR(1) DEFAULT 'N' CHECK (any_association IN ('Y', 'N')),
       association_name VARCHAR(255),
       verification VARCHAR(255),
+      notes TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -117,9 +118,23 @@ async function createTable() {
       EXECUTE FUNCTION update_updated_at_column();
   `;
 
+  // Add notes column to existing tables (migration)
+  const addNotesColumnQuery = `
+    DO $$ 
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'vendors' AND column_name = 'notes'
+      ) THEN
+        ALTER TABLE vendors ADD COLUMN notes TEXT;
+      END IF;
+    END $$;
+  `;
+
   try {
     await db.query(createTableQuery);
     await db.query(createTriggerQuery);
+    await db.query(addNotesColumnQuery);
     console.log('✓ Vendors table ready');
   } catch (err) {
     console.error('Error creating table:', err.message);
@@ -163,7 +178,8 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Transport Association',
-        'Verification': 'Verified'
+        'Verification': 'Verified',
+        'Notes': 'Reliable vendor with good track record'
       },
       {
         'Name': 'Jane Smith',
@@ -180,7 +196,8 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'N',
         'Any Association': 'N',
         'Association Name': '',
-        'Verification': 'Pending'
+        'Verification': 'Pending',
+        'Notes': 'New vendor, under review'
       },
       {
         'Name': 'Raj Kumar',
@@ -197,7 +214,8 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Mumbai Transport Union',
-        'Verification': 'Verified'
+        'Verification': 'Verified',
+        'Notes': 'Preferred vendor for Mumbai routes'
       }
     ];
 
@@ -258,7 +276,8 @@ app.post('/api/vendors', async (req, res) => {
     return_service,
     any_association,
     association_name,
-    verification
+    verification,
+    notes
   } = req.body;
 
   // Check for duplicate name and transport_name
@@ -279,8 +298,8 @@ app.post('/api/vendors', async (req, res) => {
     INSERT INTO vendors (
       name, transport_name, visiting_card, owner_broker, vendor_state, vendor_city,
       whatsapp_number, alternate_number, vehicle_type, main_service_state,
-      main_service_city, return_service, any_association, association_name, verification
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      main_service_city, return_service, any_association, association_name, verification, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING id
   `;
 
@@ -299,7 +318,8 @@ app.post('/api/vendors', async (req, res) => {
     return_service || 'N',
     any_association || 'N',
     association_name || null,
-    verification || null
+    verification || null,
+    notes || null
   ];
 
     const results = await db.query(query, values);
@@ -335,7 +355,8 @@ app.put('/api/vendors/:id', async (req, res) => {
     return_service,
     any_association,
     association_name,
-    verification
+    verification,
+    notes
   } = req.body;
 
   // Check for duplicate name and transport_name (excluding current record)
@@ -357,8 +378,8 @@ app.put('/api/vendors/:id', async (req, res) => {
         name = $1, transport_name = $2, visiting_card = $3, owner_broker = $4,
         vendor_state = $5, vendor_city = $6, whatsapp_number = $7, alternate_number = $8,
         vehicle_type = $9, main_service_state = $10, main_service_city = $11,
-        return_service = $12, any_association = $13, association_name = $14, verification = $15
-      WHERE id = $16
+        return_service = $12, any_association = $13, association_name = $14, verification = $15, notes = $16
+      WHERE id = $17
   `;
 
   const values = [
@@ -377,6 +398,7 @@ app.put('/api/vendors/:id', async (req, res) => {
     any_association || 'N',
     association_name || null,
     verification || null,
+    notes || null,
     id
   ];
 
@@ -437,8 +459,8 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
       INSERT INTO vendors (
         name, transport_name, visiting_card, owner_broker, vendor_state, vendor_city,
         whatsapp_number, alternate_number, vehicle_type, main_service_state,
-        main_service_city, return_service, any_association, association_name, verification
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        main_service_city, return_service, any_association, association_name, verification, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING id
     `;
 
@@ -463,7 +485,8 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           return_service: (row['Return Service'] || row['return_service'] || row['Return Service'] || 'N').toString().toUpperCase().substring(0, 1),
           any_association: (row['Any Association'] || row['any_association'] || row['Any Association'] || 'N').toString().toUpperCase().substring(0, 1),
           association_name: row['Association Name'] || row['association_name'] || row['Association Name'] || null,
-          verification: row['Verification'] || row['verification'] || null
+          verification: row['Verification'] || row['verification'] || null,
+          notes: row['Notes'] || row['notes'] || row['Notes'] || null
         };
 
         // Validate required fields
@@ -512,7 +535,8 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           vendorData.return_service || 'N',
           vendorData.any_association || 'N',
           vendorData.association_name || null,
-          vendorData.verification || null
+          vendorData.verification || null,
+          vendorData.notes || null
         ];
 
         const result = await db.query(insertQuery, values);

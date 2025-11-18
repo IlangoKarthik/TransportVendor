@@ -97,7 +97,8 @@
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   padding: 14px 18px;
   border: 2px solid #e8ecf1;
   border-radius: 12px;
@@ -105,15 +106,26 @@
   transition: all 0.3s ease;
   background: #f8f9fa;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  font-family: inherit;
+  resize: vertical;
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: #667eea;
   background: white;
   box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15), 0 4px 12px rgba(102, 126, 234, 0.1);
   transform: translateY(-1px);
+}
+
+.form-group-full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group textarea {
+  min-height: 100px;
 }
 
 .form-group input::placeholder {
