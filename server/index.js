@@ -631,8 +631,7 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Transport Association',
-        'Verification': 'Verified',
-        'Notes': 'Reliable vendor with good track record'
+        'Verification': 'Verified'
       },
       {
         'Name': 'Jane Smith',
@@ -649,8 +648,7 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'N',
         'Any Association': 'N',
         'Association Name': '',
-        'Verification': 'Pending',
-        'Notes': 'New vendor, under review'
+        'Verification': 'Pending'
       },
       {
         'Name': 'Raj Kumar',
@@ -667,8 +665,7 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Mumbai Transport Union',
-        'Verification': 'Verified',
-        'Notes': 'Preferred vendor for Mumbai routes'
+        'Verification': 'Verified'
       }
     ];
 
@@ -1007,8 +1004,8 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
       INSERT INTO vendors (
         name, transport_name, visiting_card, owner_broker, vendor_state, vendor_city,
         whatsapp_number, alternate_number, vehicle_type, main_service_state,
-        main_service_city, return_service, any_association, association_name, verification, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
+        main_service_city, return_service, any_association, association_name, verification
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id
     `;
 
@@ -1033,8 +1030,7 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           return_service: (row['Return Service'] || row['return_service'] || row['Return Service'] || 'N').toString().toUpperCase().substring(0, 1),
           any_association: (row['Any Association'] || row['any_association'] || row['Any Association'] || 'N').toString().toUpperCase().substring(0, 1),
           association_name: row['Association Name'] || row['association_name'] || row['Association Name'] || null,
-          verification: row['Verification'] || row['verification'] || null,
-          notes: row['Notes'] || row['notes'] || row['Notes'] || null
+          verification: row['Verification'] || row['verification'] || null
         };
 
         // Validate required fields
@@ -1083,13 +1079,7 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           vendorData.return_service || 'N',
           vendorData.any_association || 'N',
           vendorData.association_name || null,
-          vendorData.verification || null,
-          // Convert notes from Excel to array format if provided
-          vendorData.notes 
-            ? (typeof vendorData.notes === 'string' && vendorData.notes.trim() 
-              ? JSON.stringify([{ comment: vendorData.notes.trim(), timestamp: new Date().toISOString() }])
-              : '[]')
-            : '[]'
+          vendorData.verification || null
         ];
 
         const result = await db.query(insertQuery, values);
