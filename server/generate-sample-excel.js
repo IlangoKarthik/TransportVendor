@@ -16,44 +16,47 @@ const sampleData = [
     'Main Service State': 'Tamil Nadu',
     'Main Service City': 'Chennai',
     'Return Service': 'Y',
-    'Any Association': 'Y',
-    'Association Name': 'Transport Association',
-    'Verification': 'Verified'
-  },
-  {
-    'Name': 'Jane Smith',
-    'Transport Name': 'XYZ Logistics',
-    'Visiting Card': '',
-    'Owner/Broker': 'Jane Smith',
-    'Vendor State': 'Karnataka',
-    'Vendor City': 'Bangalore',
-    'WhatsApp Number': '9876543220',
-    'Alternate Number': '',
-    'Vehicle Type': 'Container',
-    'Main Service State': 'Karnataka',
-    'Main Service City': 'Bangalore',
-    'Return Service': 'N',
-    'Any Association': 'N',
-    'Association Name': '',
-    'Verification': 'Pending'
-  },
-  {
-    'Name': 'Raj Kumar',
-    'Transport Name': 'Fast Track Transport',
-    'Visiting Card': 'Card Info',
-    'Owner/Broker': 'Raj Kumar',
-    'Vendor State': 'Maharashtra',
-    'Vendor City': 'Mumbai',
-    'WhatsApp Number': '9876543230',
-    'Alternate Number': '9876543231',
-    'Vehicle Type': 'Truck',
-    'Main Service State': 'Maharashtra',
-    'Main Service City': 'Mumbai',
-    'Return Service': 'Y',
-    'Any Association': 'Y',
-    'Association Name': 'Mumbai Transport Union',
-    'Verification': 'Verified'
-  },
+        'Any Association': 'Y',
+        'Association Name': 'Transport Association',
+        'Verification': 'Verified',
+        'Notes': 'Reliable vendor with good track record'
+      },
+      {
+        'Name': 'Jane Smith',
+        'Transport Name': 'XYZ Logistics',
+        'Visiting Card': '',
+        'Owner/Broker': 'Jane Smith',
+        'Vendor State': 'Karnataka',
+        'Vendor City': 'Bangalore',
+        'WhatsApp Number': '9876543220',
+        'Alternate Number': '',
+        'Vehicle Type': 'Container',
+        'Main Service State': 'Karnataka',
+        'Main Service City': 'Bangalore',
+        'Return Service': 'N',
+        'Any Association': 'N',
+        'Association Name': '',
+        'Verification': 'Pending',
+        'Notes': 'New vendor, under review'
+      },
+      {
+        'Name': 'Raj Kumar',
+        'Transport Name': 'Fast Track Transport',
+        'Visiting Card': 'Card Info',
+        'Owner/Broker': 'Raj Kumar',
+        'Vendor State': 'Maharashtra',
+        'Vendor City': 'Mumbai',
+        'WhatsApp Number': '9876543230',
+        'Alternate Number': '9876543231',
+        'Vehicle Type': 'Truck',
+        'Main Service State': 'Maharashtra',
+        'Main Service City': 'Mumbai',
+        'Return Service': 'Y',
+        'Any Association': 'Y',
+        'Association Name': 'Mumbai Transport Union',
+        'Verification': 'Verified',
+        'Notes': 'Preferred vendor for Mumbai routes'
+      },
   {
     'Name': 'Priya Sharma',
     'Transport Name': 'Premium Cargo Movers',
@@ -69,7 +72,8 @@ const sampleData = [
     'Return Service': 'Y',
     'Any Association': 'N',
     'Association Name': '',
-    'Verification': 'Verified'
+    'Verification': 'Verified',
+    'Notes': 'Good service quality'
   },
   {
     'Name': 'Amit Patel',
@@ -86,7 +90,8 @@ const sampleData = [
     'Return Service': 'N',
     'Any Association': 'Y',
     'Association Name': 'Gujarat Transport Association',
-    'Verification': 'Pending'
+    'Verification': 'Pending',
+    'Notes': 'Specializes in small vehicle transport'
   }
 ];
 
@@ -110,7 +115,8 @@ const colWidths = [
   { wch: 15 }, // Return Service
   { wch: 18 }, // Any Association
   { wch: 25 }, // Association Name
-  { wch: 15 }  // Verification
+  { wch: 15 }, // Verification
+  { wch: 40 }  // Notes
 ];
 ws['!cols'] = colWidths;
 
