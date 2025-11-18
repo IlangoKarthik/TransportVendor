@@ -132,113 +132,336 @@ async function createTable() {
   `;
 
   // Fix field_X columns - rename them to proper names if they exist
+  // This migration runs on every server start to fix any field_X columns
   const fixFieldColumnsQuery = `
     DO $$ 
+    DECLARE
+      column_exists BOOLEAN;
+      renamed_count INTEGER := 0;
     BEGIN
-      -- Rename field_0 to transport_name (based on your data: "Patel Transport Services")
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_0')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'transport_name') THEN
-        ALTER TABLE vendors RENAME COLUMN field_0 TO transport_name;
-      END IF;
+      -- Check if table exists first
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'vendors') THEN
+        -- Rename field_0 to transport_name (based on your data: "Patel Transport Services")
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_0'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'transport_name'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_0 TO transport_name;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_0 to transport_name';
+        END IF;
 
-      -- Rename field_1 to name (based on your data: "Suresh Patel")
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_1')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'name') THEN
-        ALTER TABLE vendors RENAME COLUMN field_1 TO name;
-      END IF;
+        -- Rename field_1 to name (based on your data: "Suresh Patel")
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_1'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'name'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_1 TO name;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_1 to name';
+        END IF;
 
-      -- Rename field_2 to vendor_city (based on your data: "Ahmedabad")
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_2')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'vendor_city') THEN
-        ALTER TABLE vendors RENAME COLUMN field_2 TO vendor_city;
-      END IF;
+        -- Rename field_2 to vendor_city
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_2'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'vendor_city'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_2 TO vendor_city;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_2 to vendor_city';
+        END IF;
 
-      -- Rename field_3 to vendor_state (based on your data: "Gujarat")
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_3')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'vendor_state') THEN
-        ALTER TABLE vendors RENAME COLUMN field_3 TO vendor_state;
-      END IF;
+        -- Rename field_3 to vendor_state
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_3'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'vendor_state'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_3 TO vendor_state;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_3 to vendor_state';
+        END IF;
 
-      -- Rename field_4 to visiting_card
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_4')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'visiting_card') THEN
-        ALTER TABLE vendors RENAME COLUMN field_4 TO visiting_card;
-      END IF;
+        -- Rename field_4 to visiting_card
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_4'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'visiting_card'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_4 TO visiting_card;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_4 to visiting_card';
+        END IF;
 
-      -- Rename field_5 to vehicle_type
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_5')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'vehicle_type') THEN
-        ALTER TABLE vendors RENAME COLUMN field_5 TO vehicle_type;
-      END IF;
+        -- Rename field_5 to vehicle_type
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_5'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'vehicle_type'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_5 TO vehicle_type;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_5 to vehicle_type';
+        END IF;
 
-      -- Rename field_6 to main_service_city
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_6')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'main_service_city') THEN
-        ALTER TABLE vendors RENAME COLUMN field_6 TO main_service_city;
-      END IF;
+        -- Rename field_6 to main_service_city
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_6'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'main_service_city'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_6 TO main_service_city;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_6 to main_service_city';
+        END IF;
 
-      -- Rename field_7 to owner_broker
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_7')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'owner_broker') THEN
-        ALTER TABLE vendors RENAME COLUMN field_7 TO owner_broker;
-      END IF;
+        -- Rename field_7 to owner_broker
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_7'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'owner_broker'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_7 TO owner_broker;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_7 to owner_broker';
+        END IF;
 
-      -- Rename field_8 to whatsapp_number
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_8')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'whatsapp_number') THEN
-        ALTER TABLE vendors RENAME COLUMN field_8 TO whatsapp_number;
-      END IF;
+        -- Rename field_8 to whatsapp_number
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_8'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'whatsapp_number'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_8 TO whatsapp_number;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_8 to whatsapp_number';
+        END IF;
 
-      -- Rename field_9 to alternate_number
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_9')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'alternate_number') THEN
-        ALTER TABLE vendors RENAME COLUMN field_9 TO alternate_number;
-      END IF;
+        -- Rename field_9 to alternate_number
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_9'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'alternate_number'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_9 TO alternate_number;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_9 to alternate_number';
+        END IF;
 
-      -- Rename field_10 to main_service_state
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_10')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'main_service_state') THEN
-        ALTER TABLE vendors RENAME COLUMN field_10 TO main_service_state;
-      END IF;
+        -- Rename field_10 to main_service_state
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_10'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'main_service_state'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_10 TO main_service_state;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_10 to main_service_state';
+        END IF;
 
-      -- Rename field_11 to return_service
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_11')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'return_service') THEN
-        ALTER TABLE vendors RENAME COLUMN field_11 TO return_service;
-      END IF;
+        -- Rename field_11 to return_service
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_11'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'return_service'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_11 TO return_service;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_11 to return_service';
+        END IF;
 
-      -- Rename field_12 to any_association
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_12')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'any_association') THEN
-        ALTER TABLE vendors RENAME COLUMN field_12 TO any_association;
-      END IF;
+        -- Rename field_12 to any_association
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_12'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'any_association'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_12 TO any_association;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_12 to any_association';
+        END IF;
 
-      -- Rename field_13 to association_name
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_13')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'association_name') THEN
-        ALTER TABLE vendors RENAME COLUMN field_13 TO association_name;
-      END IF;
+        -- Rename field_13 to association_name
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_13'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'association_name'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_13 TO association_name;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_13 to association_name';
+        END IF;
 
-      -- Rename field_14 to verification
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_14')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'verification') THEN
-        ALTER TABLE vendors RENAME COLUMN field_14 TO verification;
-      END IF;
+        -- Rename field_14 to verification
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_14'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'verification'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_14 TO verification;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_14 to verification';
+        END IF;
 
-      -- Rename field_15 to notes (if notes column doesn't exist)
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_15')
-         AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'notes') THEN
-        ALTER TABLE vendors RENAME COLUMN field_15 TO notes;
-      END IF;
+        -- Handle field_15 and notes column
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'field_15'
+        ) INTO column_exists;
+        
+        IF column_exists AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'notes'
+        ) THEN
+          ALTER TABLE vendors RENAME COLUMN field_15 TO notes;
+          renamed_count := renamed_count + 1;
+          RAISE NOTICE 'Renamed field_15 to notes';
+        ELSIF column_exists AND EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_schema = current_schema() 
+          AND table_name = 'vendors' 
+          AND column_name = 'notes'
+        ) THEN
+          -- Copy data from field_15 to notes if notes is null
+          UPDATE vendors SET notes = field_15 WHERE notes IS NULL AND field_15 IS NOT NULL;
+          -- Drop field_15
+          ALTER TABLE vendors DROP COLUMN field_15;
+          RAISE NOTICE 'Merged field_15 into notes and dropped field_15';
+        END IF;
 
-      -- If notes column exists but field_15 also exists, we need to merge or drop field_15
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'field_15')
-         AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vendors' AND column_name = 'notes') THEN
-        -- Copy data from field_15 to notes if notes is null
-        UPDATE vendors SET notes = field_15 WHERE notes IS NULL AND field_15 IS NOT NULL;
-        -- Drop field_15
-        ALTER TABLE vendors DROP COLUMN field_15;
+        IF renamed_count > 0 THEN
+          RAISE NOTICE 'Migration completed: Renamed % columns from field_X to proper names', renamed_count;
+        END IF;
       END IF;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Error during column migration: %', SQLERRM;
     END $$;
   `;
 
@@ -246,10 +469,15 @@ async function createTable() {
     await db.query(createTableQuery);
     await db.query(createTriggerQuery);
     await db.query(addNotesColumnQuery);
+    
+    // Always run field_X column migration to fix any existing tables with field_X columns
+    console.log('Running column migration to fix field_X columns...');
     await db.query(fixFieldColumnsQuery);
+    
     console.log('✓ Vendors table ready');
   } catch (err) {
-    console.error('Error creating table:', err.message);
+    console.error('Error creating/migrating table:', err.message);
+    console.error('Stack:', err.stack);
   }
 }
 
