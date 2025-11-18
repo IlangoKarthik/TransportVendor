@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config';
 import ExcelImport from './ExcelImport';
@@ -10,8 +10,13 @@ const VendorList = ({ onEdit, onAddNew }) => {
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent double fetch in React StrictMode (development only)
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+    
     fetchVendors();
   }, []);
 

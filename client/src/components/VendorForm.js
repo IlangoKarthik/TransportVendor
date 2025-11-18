@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config';
 import './VendorForm.css';
@@ -29,9 +29,12 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
   const [addingComment, setAddingComment] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const isEditMode = !!vendorId;
+  const fetchedVendorIdRef = useRef(null);
 
   useEffect(() => {
-    if (vendorId) {
+    // Prevent double fetch in React StrictMode (development only)
+    if (vendorId && fetchedVendorIdRef.current !== vendorId) {
+      fetchedVendorIdRef.current = vendorId;
       fetchVendor();
     }
   }, [vendorId]);
