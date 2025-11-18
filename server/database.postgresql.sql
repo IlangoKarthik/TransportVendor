@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS vendors (
   any_association VARCHAR(1) DEFAULT 'N' CHECK (any_association IN ('Y', 'N')),
   association_name VARCHAR(255),
   verification VARCHAR(255),
-  notes TEXT,
+  notes JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -18,8 +18,7 @@ const sampleData = [
     'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Transport Association',
-        'Verification': 'Verified',
-        'Notes': 'Reliable vendor with good track record'
+        'Verification': 'Verified'
       },
       {
         'Name': 'Jane Smith',
@@ -36,8 +35,7 @@ const sampleData = [
         'Return Service': 'N',
         'Any Association': 'N',
         'Association Name': '',
-        'Verification': 'Pending',
-        'Notes': 'New vendor, under review'
+        'Verification': 'Pending'
       },
       {
         'Name': 'Raj Kumar',
@@ -54,8 +52,7 @@ const sampleData = [
         'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Mumbai Transport Union',
-        'Verification': 'Verified',
-        'Notes': 'Preferred vendor for Mumbai routes'
+        'Verification': 'Verified'
       },
   {
     'Name': 'Priya Sharma',
@@ -72,8 +69,7 @@ const sampleData = [
     'Return Service': 'Y',
     'Any Association': 'N',
     'Association Name': '',
-    'Verification': 'Verified',
-    'Notes': 'Good service quality'
+    'Verification': 'Verified'
   },
   {
     'Name': 'Amit Patel',
@@ -90,8 +86,7 @@ const sampleData = [
     'Return Service': 'N',
     'Any Association': 'Y',
     'Association Name': 'Gujarat Transport Association',
-    'Verification': 'Pending',
-    'Notes': 'Specializes in small vehicle transport'
+    'Verification': 'Pending'
   }
 ];
 
@@ -115,8 +110,7 @@ const colWidths = [
   { wch: 15 }, // Return Service
   { wch: 18 }, // Any Association
   { wch: 25 }, // Association Name
-  { wch: 15 }, // Verification
-  { wch: 40 }  // Notes
+  { wch: 15 }  // Verification
 ];
 ws['!cols'] = colWidths;
 

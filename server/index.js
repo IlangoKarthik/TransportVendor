@@ -49,33 +49,89 @@ const upload = multer({
 });
 
 // PostgreSQL Connection Pool
-const db = new Pool({
+const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'transport_vendor_db',
-  port: process.env.DB_PORT || 5432,
+  port: parseInt(process.env.DB_PORT || '5432', 10),
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   max: 10, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+  connectionTimeoutMillis: 10000, // Increased from 2s to 10s for cloud databases
+};
+
+const db = new Pool(dbConfig);
+
+// Log connection config (without password)
+console.log('📊 Database Configuration:');
+console.log(`   Host: ${dbConfig.host}`);
+console.log(`   Port: ${dbConfig.port}`);
+console.log(`   Database: ${dbConfig.database}`);
+console.log(`   User: ${dbConfig.user}`);
+console.log(`   SSL: ${dbConfig.ssl ? 'Enabled' : 'Disabled'}`);
+
+// Track connection state
+let dbConnected = false;
 
 // Test connection and create table
-db.connect()
-  .then((client) => {
-    console.log('✓ Connected to PostgreSQL database');
-    client.release();
-  // Create table if it doesn't exist
-  createTable();
-  })
-  .catch((err) => {
-    console.error('Error connecting to PostgreSQL:', err.message);
-    console.error('⚠️  Database connection failed. Please ensure PostgreSQL is running.');
-    console.error('   API endpoints will return database errors until PostgreSQL is connected.');
+async function initializeDatabase() {
+  let retries = 0;
+  const maxRetries = 5;
+  const retryDelay = 3000; // 3 seconds
+
+  while (retries < maxRetries) {
+    try {
+      const client = await db.connect();
+      console.log('✓ Connected to PostgreSQL database');
+      dbConnected = true;
+      client.release();
+      
+      // Create table if it doesn't exist
+      await createTable();
+      return;
+    } catch (err) {
+      retries++;
+      console.error(`❌ Database connection attempt ${retries}/${maxRetries} failed:`, err.message);
+      
+      if (err.code === 'ECONNREFUSED') {
+        console.error('⚠️  Connection Refused - Possible issues:');
+        console.error('   1. PostgreSQL server is not running');
+        console.error('   2. Incorrect host/port in environment variables');
+        console.error('   3. Firewall blocking the connection');
+        console.error('   4. Database server is not accessible from this network');
+      } else if (err.code === 'ENOTFOUND') {
+        console.error('⚠️  Host Not Found - Check DB_HOST environment variable');
+      } else if (err.code === '28P01') {
+        console.error('⚠️  Authentication Failed - Check DB_USER and DB_PASSWORD');
+      } else if (err.code === '3D000') {
+        console.error('⚠️  Database Does Not Exist - Check DB_NAME environment variable');
+      }
+      
+      if (retries < maxRetries) {
+        console.log(`   Retrying in ${retryDelay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else {
+        console.error('⚠️  Failed to connect after all retry attempts');
+        console.error('   API endpoints will return database errors until PostgreSQL is connected.');
+        console.error('   Please check your environment variables and ensure PostgreSQL is running.');
+      }
+    }
+  }
+}
+
+// Initialize database connection
+initializeDatabase();
+
+// Handle pool errors
+db.on('error', (err) => {
+  console.error('Unexpected database pool error:', err);
+  dbConnected = false;
 });
 
 // Create vendors table
+// Only creates the table if it doesn't exist - no migrations
+// Run migration scripts manually if needed from server/migration_*.sql files
 async function createTable() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS vendors (
@@ -95,7 +151,7 @@ async function createTable() {
       any_association VARCHAR(1) DEFAULT 'N' CHECK (any_association IN ('Y', 'N')),
       association_name VARCHAR(255),
       verification VARCHAR(255),
-      notes TEXT,
+      notes JSONB DEFAULT '[]'::jsonb,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -118,365 +174,22 @@ async function createTable() {
       EXECUTE FUNCTION update_updated_at_column();
   `;
 
-  // Add notes column to existing tables (migration)
-  const addNotesColumnQuery = `
-    DO $$ 
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'vendors' AND column_name = 'notes'
-      ) THEN
-        ALTER TABLE vendors ADD COLUMN notes TEXT;
-      END IF;
-    END $$;
-  `;
-
-  // Fix field_X columns - rename them to proper names if they exist
-  // This migration runs on every server start to fix any field_X columns
-  const fixFieldColumnsQuery = `
-    DO $$ 
-    DECLARE
-      column_exists BOOLEAN;
-      renamed_count INTEGER := 0;
-    BEGIN
-      -- Check if table exists first
-      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'vendors') THEN
-        -- Rename field_0 to transport_name (based on your data: "Patel Transport Services")
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_0'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'transport_name'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_0 TO transport_name;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_0 to transport_name';
-        END IF;
-
-        -- Rename field_1 to name (based on your data: "Suresh Patel")
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_1'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'name'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_1 TO name;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_1 to name';
-        END IF;
-
-        -- Rename field_2 to vendor_city
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_2'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'vendor_city'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_2 TO vendor_city;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_2 to vendor_city';
-        END IF;
-
-        -- Rename field_3 to vendor_state
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_3'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'vendor_state'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_3 TO vendor_state;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_3 to vendor_state';
-        END IF;
-
-        -- Rename field_4 to visiting_card
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_4'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'visiting_card'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_4 TO visiting_card;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_4 to visiting_card';
-        END IF;
-
-        -- Rename field_5 to vehicle_type
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_5'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'vehicle_type'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_5 TO vehicle_type;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_5 to vehicle_type';
-        END IF;
-
-        -- Rename field_6 to main_service_city
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_6'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'main_service_city'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_6 TO main_service_city;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_6 to main_service_city';
-        END IF;
-
-        -- Rename field_7 to owner_broker
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_7'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'owner_broker'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_7 TO owner_broker;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_7 to owner_broker';
-        END IF;
-
-        -- Rename field_8 to whatsapp_number
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_8'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'whatsapp_number'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_8 TO whatsapp_number;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_8 to whatsapp_number';
-        END IF;
-
-        -- Rename field_9 to alternate_number
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_9'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'alternate_number'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_9 TO alternate_number;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_9 to alternate_number';
-        END IF;
-
-        -- Rename field_10 to main_service_state
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_10'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'main_service_state'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_10 TO main_service_state;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_10 to main_service_state';
-        END IF;
-
-        -- Rename field_11 to return_service
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_11'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'return_service'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_11 TO return_service;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_11 to return_service';
-        END IF;
-
-        -- Rename field_12 to any_association
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_12'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'any_association'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_12 TO any_association;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_12 to any_association';
-        END IF;
-
-        -- Rename field_13 to association_name
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_13'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'association_name'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_13 TO association_name;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_13 to association_name';
-        END IF;
-
-        -- Rename field_14 to verification
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_14'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'verification'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_14 TO verification;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_14 to verification';
-        END IF;
-
-        -- Handle field_15 and notes column
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'field_15'
-        ) INTO column_exists;
-        
-        IF column_exists AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'notes'
-        ) THEN
-          ALTER TABLE vendors RENAME COLUMN field_15 TO notes;
-          renamed_count := renamed_count + 1;
-          RAISE NOTICE 'Renamed field_15 to notes';
-        ELSIF column_exists AND EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_schema = current_schema() 
-          AND table_name = 'vendors' 
-          AND column_name = 'notes'
-        ) THEN
-          -- Copy data from field_15 to notes if notes is null
-          UPDATE vendors SET notes = field_15 WHERE notes IS NULL AND field_15 IS NOT NULL;
-          -- Drop field_15
-          ALTER TABLE vendors DROP COLUMN field_15;
-          RAISE NOTICE 'Merged field_15 into notes and dropped field_15';
-        END IF;
-
-        IF renamed_count > 0 THEN
-          RAISE NOTICE 'Migration completed: Renamed % columns from field_X to proper names', renamed_count;
-        END IF;
-      END IF;
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'Error during column migration: %', SQLERRM;
-    END $$;
+  // Create indexes for better query performance
+  const createIndexesQuery = `
+    CREATE INDEX IF NOT EXISTS idx_vendor_state ON vendors(vendor_state);
+    CREATE INDEX IF NOT EXISTS idx_vendor_city ON vendors(vendor_city);
+    CREATE INDEX IF NOT EXISTS idx_main_service_state ON vendors(main_service_state);
+    CREATE INDEX IF NOT EXISTS idx_main_service_city ON vendors(main_service_city);
+    CREATE INDEX IF NOT EXISTS idx_created_at ON vendors(created_at);
   `;
 
   try {
     await db.query(createTableQuery);
     await db.query(createTriggerQuery);
-    await db.query(addNotesColumnQuery);
-    
-    // Always run field_X column migration to fix any existing tables with field_X columns
-    console.log('Running column migration to fix field_X columns...');
-    await db.query(fixFieldColumnsQuery);
-    
+    await db.query(createIndexesQuery);
     console.log('✓ Vendors table ready');
   } catch (err) {
-    console.error('Error creating/migrating table:', err.message);
+    console.error('Error creating table:', err.message);
     console.error('Stack:', err.stack);
   }
 }
@@ -486,14 +199,50 @@ async function createTable() {
 // Get all vendors
 app.get('/api/vendors', async (req, res) => {
   try {
-  const query = 'SELECT * FROM vendors ORDER BY created_at DESC';
+    // Check if database is connected
+    if (!dbConnected) {
+      return res.status(503).json({ 
+        error: 'Database connection unavailable',
+        message: 'Unable to connect to PostgreSQL database. Please check your database configuration and ensure PostgreSQL is running.',
+        code: 'DB_CONNECTION_ERROR',
+        troubleshooting: 'Check server logs for connection details and errors'
+      });
+    }
+
+    const query = 'SELECT * FROM vendors ORDER BY created_at DESC';
     const results = await db.query(query);
-    res.json(results.rows);
+    // Ensure notes is always an array
+    const vendors = results.rows.map(vendor => ({
+      ...vendor,
+      notes: Array.isArray(vendor.notes) ? vendor.notes : (vendor.notes ? [vendor.notes] : [])
+    }));
+    res.json(vendors);
   } catch (err) {
     console.error('Error fetching vendors:', err.message);
-    return res.status(500).json({ 
-      error: 'Error fetching vendors',
-      details: err.code === 'ECONNREFUSED' ? 'Database connection refused. Please ensure PostgreSQL is running.' : err.message
+    console.error('Error code:', err.code);
+    
+    let errorMessage = 'Error fetching vendors';
+    let statusCode = 500;
+    
+    if (err.code === 'ECONNREFUSED') {
+      errorMessage = 'Database connection refused';
+      statusCode = 503;
+    } else if (err.code === 'ENOTFOUND') {
+      errorMessage = 'Database host not found';
+      statusCode = 503;
+    } else if (err.code === '28P01') {
+      errorMessage = 'Database authentication failed';
+      statusCode = 503;
+    } else if (err.code === '3D000') {
+      errorMessage = 'Database does not exist';
+      statusCode = 503;
+    }
+    
+    return res.status(statusCode).json({ 
+      error: errorMessage,
+      details: err.message,
+      code: err.code,
+      troubleshooting: 'Check server logs and verify your database environment variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)'
     });
   }
 });
@@ -518,8 +267,7 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Transport Association',
-        'Verification': 'Verified',
-        'Notes': 'Reliable vendor with good track record'
+        'Verification': 'Verified'
       },
       {
         'Name': 'Jane Smith',
@@ -536,8 +284,7 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'N',
         'Any Association': 'N',
         'Association Name': '',
-        'Verification': 'Pending',
-        'Notes': 'New vendor, under review'
+        'Verification': 'Pending'
       },
       {
         'Name': 'Raj Kumar',
@@ -554,8 +301,7 @@ app.get('/api/vendors/export-template', (req, res) => {
         'Return Service': 'Y',
         'Any Association': 'Y',
         'Association Name': 'Mumbai Transport Union',
-        'Verification': 'Verified',
-        'Notes': 'Preferred vendor for Mumbai routes'
+        'Verification': 'Verified'
       }
     ];
 
@@ -588,7 +334,12 @@ app.get('/api/vendors/:id', async (req, res) => {
     if (results.rows.length === 0) {
       return res.status(404).json({ error: 'Vendor not found' });
     }
-    res.json(results.rows[0]);
+    // Ensure notes is always an array
+    const vendor = {
+      ...results.rows[0],
+      notes: Array.isArray(results.rows[0].notes) ? results.rows[0].notes : (results.rows[0].notes ? [results.rows[0].notes] : [])
+    };
+    res.json(vendor);
   } catch (err) {
     console.error('Error fetching vendor:', err.message);
     return res.status(500).json({ 
@@ -659,7 +410,7 @@ app.post('/api/vendors', async (req, res) => {
     any_association || 'N',
     association_name || null,
     verification || null,
-    notes || null
+    Array.isArray(notes) && notes.length > 0 ? JSON.stringify(notes) : '[]'
   ];
 
     const results = await db.query(query, values);
@@ -713,13 +464,18 @@ app.put('/api/vendors/:id', async (req, res) => {
     });
   }
 
+  // Don't allow editing notes through PUT endpoint - notes can only be added via dedicated endpoint
+  // Get existing notes to preserve them
+  const existingVendor = await db.query('SELECT notes FROM vendors WHERE id = $1', [id]);
+  const existingNotes = existingVendor.rows[0]?.notes || [];
+
   const query = `
     UPDATE vendors SET
         name = $1, transport_name = $2, visiting_card = $3, owner_broker = $4,
         vendor_state = $5, vendor_city = $6, whatsapp_number = $7, alternate_number = $8,
         vehicle_type = $9, main_service_state = $10, main_service_city = $11,
-        return_service = $12, any_association = $13, association_name = $14, verification = $15, notes = $16
-      WHERE id = $17
+        return_service = $12, any_association = $13, association_name = $14, verification = $15
+      WHERE id = $16
   `;
 
   const values = [
@@ -738,7 +494,6 @@ app.put('/api/vendors/:id', async (req, res) => {
     any_association || 'N',
     association_name || null,
     verification || null,
-    notes || null,
     id
   ];
 
@@ -753,6 +508,92 @@ app.put('/api/vendors/:id', async (req, res) => {
       error: 'Error updating vendor', 
       details: err.code === 'ECONNREFUSED' ? 'Database connection refused. Please ensure PostgreSQL is running.' : err.message
   });
+  }
+});
+
+// Add comment to vendor notes
+app.post('/api/vendors/:id/notes', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment } = req.body;
+
+    if (!comment || typeof comment !== 'string' || comment.trim().length === 0) {
+      return res.status(400).json({ error: 'Comment is required and cannot be empty' });
+    }
+
+    // Get existing vendor to check if it exists and get current notes
+    const vendorResult = await db.query('SELECT notes FROM vendors WHERE id = $1', [id]);
+    
+    if (vendorResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    // Get existing notes (ensure it's an array)
+    let existingNotes = vendorResult.rows[0].notes;
+    
+    // Parse if it's a string
+    if (typeof existingNotes === 'string') {
+      try {
+        existingNotes = JSON.parse(existingNotes);
+      } catch (e) {
+        console.error('Error parsing existing notes:', e);
+        existingNotes = [];
+      }
+    }
+    
+    // Ensure it's an array
+    if (!Array.isArray(existingNotes)) {
+      existingNotes = existingNotes ? [existingNotes] : [];
+    }
+
+    // Create new comment object with timestamp
+    const newComment = {
+      comment: comment.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    // Append new comment to existing notes
+    const updatedNotes = [...existingNotes, newComment];
+    
+    console.log('Adding comment to vendor:', id);
+    console.log('Existing notes count:', existingNotes.length);
+    console.log('Updated notes count:', updatedNotes.length);
+
+    // Update vendor with new notes array
+    // Cast the JSON string to JSONB in PostgreSQL
+    const updateResult = await db.query(
+      'UPDATE vendors SET notes = $1::jsonb WHERE id = $2 RETURNING notes',
+      [JSON.stringify(updatedNotes), id]
+    );
+
+    // Ensure notes is parsed as an array
+    let returnedNotes = updateResult.rows[0].notes;
+    
+    if (typeof returnedNotes === 'string') {
+      try {
+        returnedNotes = JSON.parse(returnedNotes);
+      } catch (e) {
+        console.error('Error parsing returned notes:', e);
+        returnedNotes = [];
+      }
+    }
+    
+    if (!Array.isArray(returnedNotes)) {
+      returnedNotes = returnedNotes ? [returnedNotes] : [];
+    }
+
+    console.log('Returned notes count:', returnedNotes.length);
+
+    res.json({
+      message: 'Comment added successfully',
+      notes: returnedNotes
+    });
+  } catch (err) {
+    console.error('Error adding comment:', err.message);
+    return res.status(500).json({
+      error: 'Error adding comment',
+      details: err.message
+    });
   }
 });
 
@@ -799,8 +640,8 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
       INSERT INTO vendors (
         name, transport_name, visiting_card, owner_broker, vendor_state, vendor_city,
         whatsapp_number, alternate_number, vehicle_type, main_service_state,
-        main_service_city, return_service, any_association, association_name, verification, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        main_service_city, return_service, any_association, association_name, verification
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id
     `;
 
@@ -825,8 +666,7 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           return_service: (row['Return Service'] || row['return_service'] || row['Return Service'] || 'N').toString().toUpperCase().substring(0, 1),
           any_association: (row['Any Association'] || row['any_association'] || row['Any Association'] || 'N').toString().toUpperCase().substring(0, 1),
           association_name: row['Association Name'] || row['association_name'] || row['Association Name'] || null,
-          verification: row['Verification'] || row['verification'] || null,
-          notes: row['Notes'] || row['notes'] || row['Notes'] || null
+          verification: row['Verification'] || row['verification'] || null
         };
 
         // Validate required fields
@@ -875,8 +715,7 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           vendorData.return_service || 'N',
           vendorData.any_association || 'N',
           vendorData.association_name || null,
-          vendorData.verification || null,
-          vendorData.notes || null
+          vendorData.verification || null
         ];
 
         const result = await db.query(insertQuery, values);
@@ -910,8 +749,42 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Test database connection
+    const client = await db.connect();
+    client.release();
+    
+    res.json({ 
+      status: 'OK', 
+      message: 'Server is running',
+      database: {
+        connected: true,
+        host: dbConfig.host,
+        database: dbConfig.database,
+        port: dbConfig.port
+      }
+    });
+  } catch (err) {
+    res.status(503).json({ 
+      status: 'ERROR', 
+      message: 'Server is running but database connection failed',
+      database: {
+        connected: false,
+        error: err.message,
+        code: err.code,
+        host: dbConfig.host,
+        database: dbConfig.database,
+        port: dbConfig.port
+      },
+      troubleshooting: {
+        ECONNREFUSED: 'PostgreSQL server is not running or incorrect host/port',
+        ENOTFOUND: 'Database host not found - check DB_HOST environment variable',
+        '28P01': 'Authentication failed - check DB_USER and DB_PASSWORD',
+        '3D000': 'Database does not exist - check DB_NAME environment variable'
+      }
+    });
+  }
 });
 
 app.listen(PORT, () => {

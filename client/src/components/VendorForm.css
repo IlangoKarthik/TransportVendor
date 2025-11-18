@@ -225,6 +225,105 @@
   cursor: not-allowed;
 }
 
+/* Notes/Comments Styles */
+.notes-list {
+  margin-bottom: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 2px solid #e8ecf1;
+  border-radius: 12px;
+  padding: 15px;
+  background: #f8f9fa;
+}
+
+.note-item {
+  background: white;
+  padding: 15px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-left: 3px solid #667eea;
+}
+
+.note-item:last-child {
+  margin-bottom: 0;
+}
+
+.note-content {
+  font-size: 14px;
+  color: #2d3748;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.note-timestamp {
+  font-size: 12px;
+  color: #718096;
+  font-style: italic;
+}
+
+.add-comment-form {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.add-comment-form textarea {
+  padding: 14px 18px;
+  border: 2px solid #e8ecf1;
+  border-radius: 12px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  background: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.add-comment-form textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15), 0 4px 12px rgba(102, 126, 234, 0.1);
+  transform: translateY(-1px);
+}
+
+.btn-add-comment {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  align-self: flex-start;
+}
+
+.btn-add-comment:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.btn-add-comment:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.notes-hint {
+  font-size: 14px;
+  color: #718096;
+  font-style: italic;
+  margin-top: 10px;
+}
+
 @media (max-width: 768px) {
   .vendor-form-container {
     padding: 20px 15px;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config';
 import './VendorForm.css';
@@ -19,17 +19,22 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
     return_service: 'N',
     any_association: 'N',
     association_name: '',
-    verification: '',
-    notes: ''
+    verification: ''
   });
 
+  const [notes, setNotes] = useState([]); // Notes array with comments and timestamps
+  const [newComment, setNewComment] = useState(''); // New comment input
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [addingComment, setAddingComment] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const isEditMode = !!vendorId;
+  const fetchedVendorIdRef = useRef(null);
 
   useEffect(() => {
-    if (vendorId) {
+    // Prevent double fetch in React StrictMode (development only)
+    if (vendorId && fetchedVendorIdRef.current !== vendorId) {
+      fetchedVendorIdRef.current = vendorId;
       fetchVendor();
     }
   }, [vendorId]);
@@ -53,9 +58,10 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
         return_service: response.data.return_service || 'N',
         any_association: response.data.any_association || 'N',
         association_name: response.data.association_name || '',
-        verification: response.data.verification || '',
-        notes: response.data.notes || ''
+        verification: response.data.verification || ''
       });
+      // Set notes as array
+      setNotes(Array.isArray(response.data.notes) ? response.data.notes : []);
     } catch (error) {
       console.error('Error fetching vendor:', error);
       setMessage({ 
@@ -106,9 +112,10 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
           return_service: 'N',
           any_association: 'N',
           association_name: '',
-          verification: '',
-          notes: ''
+          verification: ''
         });
+        setNotes([]);
+        setNewComment('');
       }
       
       // Call onSuccess callback after a short delay to show success message
@@ -135,6 +142,71 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddComment = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    if (!newComment.trim()) {
+      setMessage({ type: 'error', text: 'Please enter a comment' });
+      return;
+    }
+
+    if (!isEditMode || !vendorId) {
+      setMessage({ type: 'error', text: 'Please save the vendor first before adding comments' });
+      return;
+    }
+
+    setAddingComment(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/vendors/${vendorId}/notes`, {
+        comment: newComment.trim()
+      });
+      
+      // Ensure notes is an array
+      const updatedNotes = Array.isArray(response.data.notes) 
+        ? response.data.notes 
+        : (response.data.notes ? [response.data.notes] : []);
+      
+      setNotes(updatedNotes);
+      setNewComment('');
+      setMessage({ type: 'success', text: 'Comment added successfully!' });
+      
+      // Clear success message after 2 seconds
+      setTimeout(() => {
+        setMessage({ type: '', text: '' });
+      }, 2000);
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      console.error('Error response:', error.response?.data);
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.error || error.response?.data?.details || 'Error adding comment. Please try again.'
+      });
+    } finally {
+      setAddingComment(false);
+    }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (e) {
+      return timestamp;
     }
   };
 
@@ -345,15 +417,55 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
           </div>
 
           <div className="form-group form-group-full-width">
-            <label htmlFor="notes">Notes</label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="Enter any additional notes or comments"
-              rows="4"
-            />
+            <label htmlFor="notes">Comments & Notes</label>
+            
+            {/* Display existing notes/comments */}
+            {notes && notes.length > 0 && (
+              <div className="notes-list">
+                {notes.map((note, index) => (
+                  <div key={index} className="note-item">
+                    <div className="note-content">{note.comment || note}</div>
+                    <div className="note-timestamp">
+                      {note.timestamp ? formatTimestamp(note.timestamp) : 'No timestamp'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new comment section */}
+            {isEditMode && vendorId && (
+              <div className="add-comment-form">
+                <textarea
+                  id="newComment"
+                  name="newComment"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a new comment or note..."
+                  rows="3"
+                  disabled={addingComment}
+                  onKeyDown={(e) => {
+                    // Allow Ctrl+Enter or Cmd+Enter to submit
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddComment(e);
+                    }
+                  }}
+                />
+                <button 
+                  type="button" 
+                  className="btn-add-comment"
+                  onClick={handleAddComment}
+                  disabled={addingComment || !newComment.trim()}
+                >
+                  {addingComment ? 'Adding...' : 'Add Comment'}
+                </button>
+              </div>
+            )}
+
+            {!isEditMode && (
+              <p className="notes-hint">Save the vendor first to add comments</p>
+            )}
           </div>
         </div>
 
