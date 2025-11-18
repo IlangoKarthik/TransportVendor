@@ -49,30 +49,84 @@ const upload = multer({
 });
 
 // PostgreSQL Connection Pool
-const db = new Pool({
+const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'transport_vendor_db',
-  port: process.env.DB_PORT || 5432,
+  port: parseInt(process.env.DB_PORT || '5432', 10),
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   max: 10, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+  connectionTimeoutMillis: 10000, // Increased from 2s to 10s for cloud databases
+};
+
+const db = new Pool(dbConfig);
+
+// Log connection config (without password)
+console.log('📊 Database Configuration:');
+console.log(`   Host: ${dbConfig.host}`);
+console.log(`   Port: ${dbConfig.port}`);
+console.log(`   Database: ${dbConfig.database}`);
+console.log(`   User: ${dbConfig.user}`);
+console.log(`   SSL: ${dbConfig.ssl ? 'Enabled' : 'Disabled'}`);
+
+// Track connection state
+let dbConnected = false;
 
 // Test connection and create table
-db.connect()
-  .then((client) => {
-    console.log('✓ Connected to PostgreSQL database');
-    client.release();
-  // Create table if it doesn't exist
-  createTable();
-  })
-  .catch((err) => {
-    console.error('Error connecting to PostgreSQL:', err.message);
-    console.error('⚠️  Database connection failed. Please ensure PostgreSQL is running.');
-    console.error('   API endpoints will return database errors until PostgreSQL is connected.');
+async function initializeDatabase() {
+  let retries = 0;
+  const maxRetries = 5;
+  const retryDelay = 3000; // 3 seconds
+
+  while (retries < maxRetries) {
+    try {
+      const client = await db.connect();
+      console.log('✓ Connected to PostgreSQL database');
+      dbConnected = true;
+      client.release();
+      
+      // Create table if it doesn't exist
+      await createTable();
+      return;
+    } catch (err) {
+      retries++;
+      console.error(`❌ Database connection attempt ${retries}/${maxRetries} failed:`, err.message);
+      
+      if (err.code === 'ECONNREFUSED') {
+        console.error('⚠️  Connection Refused - Possible issues:');
+        console.error('   1. PostgreSQL server is not running');
+        console.error('   2. Incorrect host/port in environment variables');
+        console.error('   3. Firewall blocking the connection');
+        console.error('   4. Database server is not accessible from this network');
+      } else if (err.code === 'ENOTFOUND') {
+        console.error('⚠️  Host Not Found - Check DB_HOST environment variable');
+      } else if (err.code === '28P01') {
+        console.error('⚠️  Authentication Failed - Check DB_USER and DB_PASSWORD');
+      } else if (err.code === '3D000') {
+        console.error('⚠️  Database Does Not Exist - Check DB_NAME environment variable');
+      }
+      
+      if (retries < maxRetries) {
+        console.log(`   Retrying in ${retryDelay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else {
+        console.error('⚠️  Failed to connect after all retry attempts');
+        console.error('   API endpoints will return database errors until PostgreSQL is connected.');
+        console.error('   Please check your environment variables and ensure PostgreSQL is running.');
+      }
+    }
+  }
+}
+
+// Initialize database connection
+initializeDatabase();
+
+// Handle pool errors
+db.on('error', (err) => {
+  console.error('Unexpected database pool error:', err);
+  dbConnected = false;
 });
 
 // Create vendors table
@@ -95,7 +149,7 @@ async function createTable() {
       any_association VARCHAR(1) DEFAULT 'N' CHECK (any_association IN ('Y', 'N')),
       association_name VARCHAR(255),
       verification VARCHAR(255),
-      notes TEXT,
+      notes JSONB DEFAULT '[]'::jsonb,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -119,14 +173,37 @@ async function createTable() {
   `;
 
   // Add notes column to existing tables (migration)
+  // Convert notes from TEXT to JSONB array if it exists as TEXT
   const addNotesColumnQuery = `
     DO $$ 
     BEGIN
-      IF NOT EXISTS (
+      -- Check if notes column exists
+      IF EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'vendors' AND column_name = 'notes'
       ) THEN
-        ALTER TABLE vendors ADD COLUMN notes TEXT;
+        -- Check if it's TEXT type and needs conversion to JSONB
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'vendors' 
+          AND column_name = 'notes' 
+          AND data_type = 'text'
+        ) THEN
+          -- Convert existing TEXT notes to JSONB array format
+          ALTER TABLE vendors ALTER COLUMN notes TYPE JSONB USING 
+            CASE 
+              WHEN notes IS NULL OR notes = '' THEN '[]'::jsonb
+              ELSE jsonb_build_array(
+                jsonb_build_object(
+                  'comment', notes,
+                  'timestamp', COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)
+                )
+              )
+            END;
+        END IF;
+      ELSE
+        -- Add notes column as JSONB array if it doesn't exist
+        ALTER TABLE vendors ADD COLUMN notes JSONB DEFAULT '[]'::jsonb;
       END IF;
     END $$;
   `;
@@ -486,14 +563,50 @@ async function createTable() {
 // Get all vendors
 app.get('/api/vendors', async (req, res) => {
   try {
-  const query = 'SELECT * FROM vendors ORDER BY created_at DESC';
+    // Check if database is connected
+    if (!dbConnected) {
+      return res.status(503).json({ 
+        error: 'Database connection unavailable',
+        message: 'Unable to connect to PostgreSQL database. Please check your database configuration and ensure PostgreSQL is running.',
+        code: 'DB_CONNECTION_ERROR',
+        troubleshooting: 'Check server logs for connection details and errors'
+      });
+    }
+
+    const query = 'SELECT * FROM vendors ORDER BY created_at DESC';
     const results = await db.query(query);
-    res.json(results.rows);
+    // Ensure notes is always an array
+    const vendors = results.rows.map(vendor => ({
+      ...vendor,
+      notes: Array.isArray(vendor.notes) ? vendor.notes : (vendor.notes ? [vendor.notes] : [])
+    }));
+    res.json(vendors);
   } catch (err) {
     console.error('Error fetching vendors:', err.message);
-    return res.status(500).json({ 
-      error: 'Error fetching vendors',
-      details: err.code === 'ECONNREFUSED' ? 'Database connection refused. Please ensure PostgreSQL is running.' : err.message
+    console.error('Error code:', err.code);
+    
+    let errorMessage = 'Error fetching vendors';
+    let statusCode = 500;
+    
+    if (err.code === 'ECONNREFUSED') {
+      errorMessage = 'Database connection refused';
+      statusCode = 503;
+    } else if (err.code === 'ENOTFOUND') {
+      errorMessage = 'Database host not found';
+      statusCode = 503;
+    } else if (err.code === '28P01') {
+      errorMessage = 'Database authentication failed';
+      statusCode = 503;
+    } else if (err.code === '3D000') {
+      errorMessage = 'Database does not exist';
+      statusCode = 503;
+    }
+    
+    return res.status(statusCode).json({ 
+      error: errorMessage,
+      details: err.message,
+      code: err.code,
+      troubleshooting: 'Check server logs and verify your database environment variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)'
     });
   }
 });
@@ -588,7 +701,12 @@ app.get('/api/vendors/:id', async (req, res) => {
     if (results.rows.length === 0) {
       return res.status(404).json({ error: 'Vendor not found' });
     }
-    res.json(results.rows[0]);
+    // Ensure notes is always an array
+    const vendor = {
+      ...results.rows[0],
+      notes: Array.isArray(results.rows[0].notes) ? results.rows[0].notes : (results.rows[0].notes ? [results.rows[0].notes] : [])
+    };
+    res.json(vendor);
   } catch (err) {
     console.error('Error fetching vendor:', err.message);
     return res.status(500).json({ 
@@ -659,7 +777,7 @@ app.post('/api/vendors', async (req, res) => {
     any_association || 'N',
     association_name || null,
     verification || null,
-    notes || null
+    Array.isArray(notes) && notes.length > 0 ? JSON.stringify(notes) : '[]'
   ];
 
     const results = await db.query(query, values);
@@ -713,13 +831,18 @@ app.put('/api/vendors/:id', async (req, res) => {
     });
   }
 
+  // Don't allow editing notes through PUT endpoint - notes can only be added via dedicated endpoint
+  // Get existing notes to preserve them
+  const existingVendor = await db.query('SELECT notes FROM vendors WHERE id = $1', [id]);
+  const existingNotes = existingVendor.rows[0]?.notes || [];
+
   const query = `
     UPDATE vendors SET
         name = $1, transport_name = $2, visiting_card = $3, owner_broker = $4,
         vendor_state = $5, vendor_city = $6, whatsapp_number = $7, alternate_number = $8,
         vehicle_type = $9, main_service_state = $10, main_service_city = $11,
-        return_service = $12, any_association = $13, association_name = $14, verification = $15, notes = $16
-      WHERE id = $17
+        return_service = $12, any_association = $13, association_name = $14, verification = $15
+      WHERE id = $16
   `;
 
   const values = [
@@ -738,7 +861,6 @@ app.put('/api/vendors/:id', async (req, res) => {
     any_association || 'N',
     association_name || null,
     verification || null,
-    notes || null,
     id
   ];
 
@@ -753,6 +875,92 @@ app.put('/api/vendors/:id', async (req, res) => {
       error: 'Error updating vendor', 
       details: err.code === 'ECONNREFUSED' ? 'Database connection refused. Please ensure PostgreSQL is running.' : err.message
   });
+  }
+});
+
+// Add comment to vendor notes
+app.post('/api/vendors/:id/notes', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment } = req.body;
+
+    if (!comment || typeof comment !== 'string' || comment.trim().length === 0) {
+      return res.status(400).json({ error: 'Comment is required and cannot be empty' });
+    }
+
+    // Get existing vendor to check if it exists and get current notes
+    const vendorResult = await db.query('SELECT notes FROM vendors WHERE id = $1', [id]);
+    
+    if (vendorResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    // Get existing notes (ensure it's an array)
+    let existingNotes = vendorResult.rows[0].notes;
+    
+    // Parse if it's a string
+    if (typeof existingNotes === 'string') {
+      try {
+        existingNotes = JSON.parse(existingNotes);
+      } catch (e) {
+        console.error('Error parsing existing notes:', e);
+        existingNotes = [];
+      }
+    }
+    
+    // Ensure it's an array
+    if (!Array.isArray(existingNotes)) {
+      existingNotes = existingNotes ? [existingNotes] : [];
+    }
+
+    // Create new comment object with timestamp
+    const newComment = {
+      comment: comment.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    // Append new comment to existing notes
+    const updatedNotes = [...existingNotes, newComment];
+    
+    console.log('Adding comment to vendor:', id);
+    console.log('Existing notes count:', existingNotes.length);
+    console.log('Updated notes count:', updatedNotes.length);
+
+    // Update vendor with new notes array
+    // Cast the JSON string to JSONB in PostgreSQL
+    const updateResult = await db.query(
+      'UPDATE vendors SET notes = $1::jsonb WHERE id = $2 RETURNING notes',
+      [JSON.stringify(updatedNotes), id]
+    );
+
+    // Ensure notes is parsed as an array
+    let returnedNotes = updateResult.rows[0].notes;
+    
+    if (typeof returnedNotes === 'string') {
+      try {
+        returnedNotes = JSON.parse(returnedNotes);
+      } catch (e) {
+        console.error('Error parsing returned notes:', e);
+        returnedNotes = [];
+      }
+    }
+    
+    if (!Array.isArray(returnedNotes)) {
+      returnedNotes = returnedNotes ? [returnedNotes] : [];
+    }
+
+    console.log('Returned notes count:', returnedNotes.length);
+
+    res.json({
+      message: 'Comment added successfully',
+      notes: returnedNotes
+    });
+  } catch (err) {
+    console.error('Error adding comment:', err.message);
+    return res.status(500).json({
+      error: 'Error adding comment',
+      details: err.message
+    });
   }
 });
 
@@ -800,7 +1008,7 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
         name, transport_name, visiting_card, owner_broker, vendor_state, vendor_city,
         whatsapp_number, alternate_number, vehicle_type, main_service_state,
         main_service_city, return_service, any_association, association_name, verification, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)
       RETURNING id
     `;
 
@@ -876,7 +1084,12 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
           vendorData.any_association || 'N',
           vendorData.association_name || null,
           vendorData.verification || null,
-          vendorData.notes || null
+          // Convert notes from Excel to array format if provided
+          vendorData.notes 
+            ? (typeof vendorData.notes === 'string' && vendorData.notes.trim() 
+              ? JSON.stringify([{ comment: vendorData.notes.trim(), timestamp: new Date().toISOString() }])
+              : '[]')
+            : '[]'
         ];
 
         const result = await db.query(insertQuery, values);
@@ -910,8 +1123,42 @@ app.post('/api/vendors/import', upload.single('file'), async (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Test database connection
+    const client = await db.connect();
+    client.release();
+    
+    res.json({ 
+      status: 'OK', 
+      message: 'Server is running',
+      database: {
+        connected: true,
+        host: dbConfig.host,
+        database: dbConfig.database,
+        port: dbConfig.port
+      }
+    });
+  } catch (err) {
+    res.status(503).json({ 
+      status: 'ERROR', 
+      message: 'Server is running but database connection failed',
+      database: {
+        connected: false,
+        error: err.message,
+        code: err.code,
+        host: dbConfig.host,
+        database: dbConfig.database,
+        port: dbConfig.port
+      },
+      troubleshooting: {
+        ECONNREFUSED: 'PostgreSQL server is not running or incorrect host/port',
+        ENOTFOUND: 'Database host not found - check DB_HOST environment variable',
+        '28P01': 'Authentication failed - check DB_USER and DB_PASSWORD',
+        '3D000': 'Database does not exist - check DB_NAME environment variable'
+      }
+    });
+  }
 });
 
 app.listen(PORT, () => {

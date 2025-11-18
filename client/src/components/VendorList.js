@@ -23,7 +23,17 @@ const VendorList = ({ onEdit, onAddNew }) => {
       setError('');
     } catch (err) {
       console.error('Error fetching vendors:', err);
-      setError('Error loading vendors. Please try again.');
+      
+      // Provide more specific error messages
+      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+        setError(`Cannot connect to backend server at ${API_BASE_URL}. Please ensure the backend server is running on port 5000.`);
+      } else if (err.response?.status === 503) {
+        setError('Backend server is running but database connection failed. Please check server logs.');
+      } else if (err.response?.data?.error) {
+        setError(err.response.data.error + (err.response.data.details ? `: ${err.response.data.details}` : ''));
+      } else {
+        setError('Error loading vendors. Please check if the backend server is running.');
+      }
     } finally {
       setLoading(false);
     }
