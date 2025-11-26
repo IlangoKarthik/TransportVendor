@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config';
+import { indianStates, getCitiesByState } from '../data/indianStatesCities';
+import CustomDropdown from './CustomDropdown';
 import './VendorForm.css';
 
 const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
@@ -75,10 +77,26 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // If state changes, reset the corresponding city field
+    if (name === 'vendor_state') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        vendor_city: '' // Reset city when state changes
+      }));
+    } else if (name === 'main_service_state') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        main_service_city: '' // Reset city when state changes
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -210,6 +228,38 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
     }
   };
 
+  // Convert states array to dropdown options format
+  const getStateOptions = () => {
+    return indianStates.map(state => ({
+      value: state,
+      label: state
+    }));
+  };
+
+  // Get cities for a state as dropdown options, including existing city value if not in the list
+  const getCityOptions = (state, currentCity) => {
+    const cities = getCitiesByState(state);
+    let cityList = [...cities];
+    
+    // If there's a current city value that's not in the list, add it
+    if (currentCity && currentCity.trim() && !cityList.includes(currentCity)) {
+      cityList = [currentCity, ...cityList];
+    }
+    
+    return cityList.map(city => ({
+      value: city,
+      label: city
+    }));
+  };
+
+  // Yes/No options for dropdowns
+  const getYesNoOptions = () => {
+    return [
+      { value: 'N', label: 'No' },
+      { value: 'Y', label: 'Yes' }
+    ];
+  };
+
   if (fetching) {
     return (
       <div className="vendor-form-container">
@@ -282,25 +332,26 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
 
           <div className="form-group">
             <label htmlFor="vendor_state">Vendor State</label>
-            <input
-              type="text"
+            <CustomDropdown
               id="vendor_state"
               name="vendor_state"
               value={formData.vendor_state}
+              options={getStateOptions()}
+              placeholder="Select State"
               onChange={handleChange}
-              placeholder="Enter vendor state"
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="vendor_city">Vendor City</label>
-            <input
-              type="text"
+            <CustomDropdown
               id="vendor_city"
               name="vendor_city"
               value={formData.vendor_city}
+              options={formData.vendor_state ? getCityOptions(formData.vendor_state, formData.vendor_city) : []}
+              placeholder="Select City"
+              disabled={!formData.vendor_state}
               onChange={handleChange}
-              placeholder="Enter vendor city"
             />
           </div>
 
@@ -342,52 +393,51 @@ const VendorForm = ({ vendorId, onCancel, onSuccess }) => {
 
           <div className="form-group">
             <label htmlFor="main_service_state">Main Service State</label>
-            <input
-              type="text"
+            <CustomDropdown
               id="main_service_state"
               name="main_service_state"
               value={formData.main_service_state}
+              options={getStateOptions()}
+              placeholder="Select State"
               onChange={handleChange}
-              placeholder="Enter main service state"
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="main_service_city">Main Service City</label>
-            <input
-              type="text"
+            <CustomDropdown
               id="main_service_city"
               name="main_service_city"
               value={formData.main_service_city}
+              options={formData.main_service_state ? getCityOptions(formData.main_service_state, formData.main_service_city) : []}
+              placeholder="Select City"
+              disabled={!formData.main_service_state}
               onChange={handleChange}
-              placeholder="Enter main service city"
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="return_service">Return Service</label>
-            <select
+            <CustomDropdown
               id="return_service"
               name="return_service"
               value={formData.return_service}
+              options={getYesNoOptions()}
+              placeholder="Select"
               onChange={handleChange}
-            >
-              <option value="N">No</option>
-              <option value="Y">Yes</option>
-            </select>
+            />
           </div>
 
           <div className="form-group">
             <label htmlFor="any_association">Any Association</label>
-            <select
+            <CustomDropdown
               id="any_association"
               name="any_association"
               value={formData.any_association}
+              options={getYesNoOptions()}
+              placeholder="Select"
               onChange={handleChange}
-            >
-              <option value="N">No</option>
-              <option value="Y">Yes</option>
-            </select>
+            />
           </div>
 
           {formData.any_association === 'Y' && (
