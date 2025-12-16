@@ -1,21 +1,17 @@
 {
-  "name": "transport-vendor-app",
-  "version": "1.0.0",
-  "description": "Full-stack application for transport vendor registration",
-  "main": "server/index.js",
+  "name": "netkathir-ai-tool",
+  "version": "2.0.0",
+  "description": "Unified AI platform with document search, vendor management, and AI search",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd server && ./node_modules/.bin/nodemon index.js",
-    "client": "cd client && PORT=3001 npm start",
-    "install-server": "cd server && npm install",
-    "install-client": "cd client && npm install",
-    "install-all": "npm run install-server && npm run install-client"
+    "start": "concurrently \"npm run flask\" \"npm run server\" \"npm run client\"",
+    "flask": "./start-flask-services.sh",
+    "server": "cd server && npm start",
+    "client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "install-all": "cd server && npm install && cd ../client && npm install",
+    "stop-flask": "./stop-flask-services.sh"
   },
-  "keywords": ["react", "express", "mysql", "fullstack"],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "concurrently": "^8.2.2"
   }
 }
-

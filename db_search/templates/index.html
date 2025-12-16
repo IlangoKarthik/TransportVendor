@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ui.page_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <img src="{{ url_for('static', filename='icons/' + ui.icons.main_logo) }}" class="icon-large" alt="Logo">
+                {{ ui.main_heading }}
+            </h1>
+            <p class="subtitle">{{ ui.subtitle }}</p>
+        </header>
+
+        <!-- Statistics -->
+        <div class="stats" id="stats"></div>
+
+        <!-- Search Box -->
+        <div class="search-box">
+            <div class="search-input-group">
+                <input 
+                    type="text" 
+                    id="searchQuery" 
+                    placeholder="{{ ui.search_placeholder }}"
+                    onkeypress="handleEnter(event)"
+                >
+                <button onclick="search()" id="searchBtn">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.search) }}" class="icon" alt="Search">
+                    {{ ui.search_button }}
+                </button>
+                <button onclick="startVoiceRecording()" id="voiceBtn">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.microphone) }}" class="icon" id="micIcon" alt="Voice">
+                    Voice
+                </button>
+            </div>
+
+            <!-- Utility Buttons -->
+            <div class="utility-buttons">
+                <button onclick="showRefreshConfirmation()" class="utility-btn refresh-btn" title="Refresh embeddings cache">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.refresh) }}" class="icon" alt="Refresh">
+                    Refresh Embeddings
+                </button>
+                <button onclick="generateAISummary()" id="aiSummaryBtn" class="utility-btn ai-summary-btn" style="display: none;" title="Generate AI summary of results">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.lightbulb) }}" class="icon" alt="AI Summary">
+                    {{ ui.generate_summary_button }}
+                </button>
+            </div>
+
+            <!-- Response Format Selector -->
+            <div class="custom-select">
+                <label>Response Format</label>
+                <div class="select-wrapper">
+                    <div class="select-button" onclick="toggleDropdown('responseFormat')">
+                        <span id="responseFormatText">AI Summary</span>
+                        <img src="{{ url_for('static', filename='icons/' + ui.icons.chevron_down) }}" class="icon" alt="Dropdown">
+                    </div>
+                    <div class="select-dropdown" id="responseFormatDropdown">
+                        <div class="select-option" onclick="selectOption('responseFormat', 'cards', 'Detailed Cards')">Detailed Cards</div>
+                        <div class="select-option" onclick="selectOption('responseFormat', 'brief', 'Brief Summary')">Brief Summary</div>
+                        <div class="select-option selected" onclick="selectOption('responseFormat', 'ai_summary', 'AI Summary')">AI Summary</div>
+                        <div class="select-option" onclick="selectOption('responseFormat', 'table', 'Table View')">Table View</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Filters -->
+            <details>
+                <summary>
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.filter) }}" class="icon" style="display: inline-block; margin-right: 8px;" alt="Filter">
+                    Advanced Filters
+                </summary>
+                <div class="filters">
+                    {% for filter in advanced_filters %}
+                    <div class="filter-group {% if filter.type == 'select' %}custom-filter-select{% endif %}">
+                        <label>{{ filter.label }}</label>
+                        {% if filter.type == 'text' %}
+                        <input type="text" id="{{ filter.id }}" placeholder="{{ filter.placeholder }}">
+                        {% elif filter.type == 'checkbox' %}
+                        <input type="checkbox" id="{{ filter.id }}">
+                        {% elif filter.type == 'select' %}
+                        <div class="select-button" onclick="toggleDropdown('{{ filter.id }}')">
+                            <span id="{{ filter.id }}Text">{{ filter.options[0] if filter.options else 'Select...' }}</span>
+                            <img src="{{ url_for('static', filename='icons/' + ui.icons.chevron_down) }}" class="icon" alt="Dropdown">
+                        </div>
+                        <div class="select-dropdown" id="{{ filter.id }}Dropdown">
+                            {% for option in filter.options %}
+                            <div class="select-option {% if loop.first %}selected{% endif %}" onclick="selectFilterOption('{{ filter.id }}', '{{ option if option != 'All' else '' }}', '{{ option }}')">{{ option }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Custom Threshold Slider -->
+                <div class="custom-range">
+                    <label>{{ ui.filter_threshold_label }}</label>
+                    <div class="range-container">
+                        <div class="range-slider" id="thresholdSlider">
+                            <div class="range-track" id="thresholdTrack"></div>
+                            <div class="range-thumb" id="thresholdThumb"></div>
+                        </div>
+                        <div class="range-value" id="thresholdValue"></div>
+                    </div>
+                </div>
+
+                <!-- Max Results Slider -->
+                <div class="custom-range">
+                    <label>{{ ui.filter_max_results_label }}</label>
+                    <div class="range-container">
+                        <div class="range-slider" id="maxResultsSlider">
+                            <div class="range-track" id="maxResultsTrack"></div>
+                            <div class="range-thumb" id="maxResultsThumb"></div>
+                        </div>
+                        <div class="range-value" id="maxResultsValue"></div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Audio Visualizer -->
+            <div id="audioVisualizer"></div>
+            <div class="recording-indicator" id="recordingIndicator">
+                <img src="{{ url_for('static', filename='icons/' + ui.icons.recording_dot) }}" class="icon" alt="Recording">
+                Recording... Speak now!
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="results-container"></div>
+    </div>
+
+    <!-- Refresh Confirmation Modal -->
+    <div class="modal-overlay" id="refreshModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <img src="{{ url_for('static', filename='icons/' + ui.icons.alert_circle) }}" alt="Alert">
+                <h3>Refresh Embeddings?</h3>
+            </div>
+            <div class="modal-body">
+                <p>This will rebuild the search index from your database. This process may take 1-2 minutes.</p>
+                <div class="info-text">
+                    <strong>When to refresh:</strong><br>
+                    • After updating/adding data to your database<br>
+                    • When search results seem outdated<br>
+                    • After changing field weights in config.py
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" onclick="closeRefreshModal()">Cancel</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmRefresh()">Yes, Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        let selectedFormat = 'ai_summary';  // Default to AI Summary
+        let selectedFilters = {};  // Store selected filter values dynamically
+        let thresholdValue = {{ similarity_threshold }};
+        let maxResults = {{ max_results }};
+        const PRIMARY_FIELD = '{{ primary_field }}';
+        
+        // Extract token from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const authToken = urlParams.get('token');
+        
+        // Field configuration from config.py
+        const FIELD_MAP = {{ field_map | tojson }};
+        const CARD_DISPLAY_INDICES = {{ card_display_indices | tojson }};
+        const PRIMARY_DISPLAY_INDEX = {{ primary_display_index }};
+        
+        // Advanced filters configuration (completely generic)
+        const ADVANCED_FILTERS = {{ advanced_filters | tojson }};
+        
+        // UI text configuration
+        const UI_TEXT = {{ ui | tojson }};
+        const ENTITY_NAME = UI_TEXT.entity_name || 'records';
+        const ENTITY_NAME_SINGULAR = UI_TEXT.entity_name_singular || 'record';
+
+        // Helper function for smooth auto-scroll to element
+        function scrollToElement(elementId) {
+            setTimeout(() => {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start',
+                        inline: 'nearest'
+                    });
+                }
+            }, 100);  // Small delay to ensure content is rendered
+        }
+
+        // Helper function to convert markdown to HTML
+        function markdownToHtml(text) {
+            if (!text) return '';
+            
+            // Helper to process inline markdown (bold, italic)
+            function processInlineMarkdown(str) {
+                // Bold with **
+                str = str.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                // Bold with __
+                str = str.replace(/__(.+?)__/g, '<strong>$1</strong>');
+                // Italic with *
+                str = str.replace(/\*(.+?)\*/g, '<em>$1</em>');
+                // Italic with _
+                str = str.replace(/_(.+?)_/g, '<em>$1</em>');
+                return str;
+            }
+            
+            // Split into lines for better processing
+            const lines = text.split('\n');
+            let html = '';
+            let listStack = [];  // Stack to track nested lists: [{type: 'ol'|'ul', indent: 0}]
+            let inItemBlock = false;
+            let currentItem = '';
+            
+            for (let i = 0; i < lines.length; i++) {
+                const rawLine = lines[i];
+                const line = rawLine.trim();
+                const indent = rawLine.length - rawLine.trimLeft().length;
+                
+                // Skip completely empty lines - close lists if needed
+                if (!line) {
+                    while (listStack.length > 0) {
+                        listStack.pop();
+                        html += '</ul>';
+                    }
+                    continue;
+                }
+                
+                // Check for item name in bold format: **Item Name (Location)**
+                const itemMatch = line.match(/^\*\*([^*]+\([^)]+\))\*\*/);
+                if (itemMatch) {
+                    // Close any open lists
+                    while (listStack.length > 0) {
+                        listStack.pop();
+                        html += '</ul>';
+                    }
+                    if (inItemBlock) {
+                        html += '</div>';
+                    }
+                    
+                    currentItem = itemMatch[1].trim();
+                    
+                    // Start new item block with styling
+                    html += `<div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 5px;">`;
+                    html += `<h4 style="margin: 0 0 10px 0; color: #667eea; font-weight: 600;">${currentItem}</h4>`;
+                    inItemBlock = true;
+                    
+                    // Check if there's description text after the item name on the same line
+                    const restOfLine = line.substring(itemMatch[0].length).trim();
+                    if (restOfLine.startsWith('-')) {
+                        const description = processInlineMarkdown(restOfLine.substring(1).trim());
+                        html += `<p style="margin: 10px 0 5px 0; line-height: 1.6;">${description}</p>`;
+                    }
+                    continue;
+                }
+                
+                // Check for numbered lists - treat them as bullet points for consistency
+                const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+                if (numberedMatch) {
+                    const content = processInlineMarkdown(numberedMatch[2]);
+                    
+                    // Close deeper nested lists if indent decreased
+                    while (listStack.length > 0 && listStack[listStack.length - 1].indent > indent) {
+                        const listType = listStack.pop();
+                        html += '</ul>';
+                    }
+                    
+                    // Check if we need to start a new list or continue existing
+                    if (listStack.length === 0 || listStack[listStack.length - 1].indent < indent) {
+                        // Start new nested list
+                        html += '<ul style="margin: 10px 0; padding-left: 25px; line-height: 1.8;">';
+                        listStack.push({type: 'ul', indent: indent});
+                    }
+                    
+                    html += `<li style="margin: 8px 0; padding-left: 5px;">${content}</li>`;
+                    continue;
+                }
+                
+                // Check for bullet points (with proper indent detection)
+                const bulletMatch = line.match(/^[-*•]\s+(.+)$/);
+                if (bulletMatch) {
+                    const content = processInlineMarkdown(bulletMatch[1]);
+                    
+                    // Close deeper nested lists if indent decreased
+                    while (listStack.length > 0 && listStack[listStack.length - 1].indent > indent) {
+                        listStack.pop();
+                        html += '</ul>';
+                    }
+                    
+                    // Check if we need to start a new list or continue existing
+                    if (listStack.length === 0 || listStack[listStack.length - 1].indent < indent) {
+                        // Start new nested list
+                        html += '<ul style="margin: 10px 0; padding-left: 25px; line-height: 1.8;">';
+                        listStack.push({type: 'ul', indent: indent});
+                    }
+                    
+                    html += `<li style="margin: 8px 0; padding-left: 5px;">${content}</li>`;
+                    continue;
+                }
+                
+                // If we reach here and there are open lists, close them (non-list content)
+                while (listStack.length > 0) {
+                    listStack.pop();
+                    html += '</ul>';
+                }
+                
+                // Headers
+                if (line.startsWith('###')) {
+                    if (inItemBlock) {
+                        html += '</div>';
+                        inItemBlock = false;
+                    }
+                    const headerText = processInlineMarkdown(line.replace(/^###\s*/, ''));
+                    html += `<h3 style="margin-top: 20px; color: #667eea;">${headerText}</h3>`;
+                    continue;
+                } else if (line.startsWith('##')) {
+                    if (inItemBlock) {
+                        html += '</div>';
+                        inItemBlock = false;
+                    }
+                    const headerText = processInlineMarkdown(line.replace(/^##\s*/, ''));
+                    html += `<h2 style="margin-top: 20px; color: #667eea;">${headerText}</h2>`;
+                    continue;
+                } else if (line.startsWith('#')) {
+                    if (inItemBlock) {
+                        html += '</div>';
+                        inItemBlock = false;
+                    }
+                    const headerText = processInlineMarkdown(line.replace(/^#\s*/, ''));
+                    html += `<h1 style="margin-top: 20px; color: #667eea;">${headerText}</h1>`;
+                    continue;
+                }
+                
+                // If we're in an item block, treat as continuation text
+                if (inItemBlock) {
+                    const processedLine = processInlineMarkdown(line);
+                    html += `<p style="margin: 5px 0; line-height: 1.6;">${processedLine}</p>`;
+                    continue;
+                }
+                
+                // Regular paragraph - apply inline formatting
+                const processedLine = processInlineMarkdown(line);
+                html += `<p style="margin: 8px 0; line-height: 1.6;">${processedLine}</p>`;
+            }
+            
+            // Close any remaining open tags
+            // Close any remaining open lists
+            while (listStack.length > 0) {
+                listStack.pop();
+                html += '</ul>';
+            }
+            if (inItemBlock) {
+                html += '</div>';
+            }
+            
+            return html;
+        }
+
+        // Load statistics and initialize sliders on page load
+        window.onload = function() {
+            loadStats();
+            initSliders();
+        };
+
+        // Custom Select Dropdown
+        function toggleDropdown(selectId) {
+            const dropdown = document.getElementById(selectId + 'Dropdown');
+            const button = dropdown.previousElementSibling;
+            
+            // Close other dropdowns
+            document.querySelectorAll('.select-dropdown').forEach(d => {
+                if (d !== dropdown) {
+                    d.classList.remove('active');
+                    const prevBtn = d.previousElementSibling;
+                    if (prevBtn && prevBtn.classList.contains('select-button')) {
+                        prevBtn.classList.remove('active');
+                    }
+                }
+            });
+            
+            dropdown.classList.toggle('active');
+            if (button) button.classList.toggle('active');
+        }
+
+        function selectOption(selectId, value, text) {
+            selectedFormat = value;
+            document.getElementById(selectId + 'Text').textContent = text;
+            
+            // Update selected state
+            const dropdown = document.getElementById(selectId + 'Dropdown');
+            dropdown.querySelectorAll('.select-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            // Close dropdown
+            dropdown.classList.remove('active');
+            dropdown.previousElementSibling.classList.remove('active');
+        }
+
+        function selectFilterOption(selectId, value, text) {
+            // Store the selected filter value dynamically
+            selectedFilters[selectId] = value;
+            document.getElementById(selectId + 'Text').textContent = text;
+            
+            // Update selected state
+            const dropdown = document.getElementById(selectId + 'Dropdown');
+            dropdown.querySelectorAll('.select-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            // Close dropdown
+            dropdown.classList.remove('active');
+        }
+
+        // Custom Range Sliders
+        const thresholdSlider = document.getElementById('thresholdSlider');
+        const thresholdTrack = document.getElementById('thresholdTrack');
+        const thresholdThumb = document.getElementById('thresholdThumb');
+        const thresholdDisplay = document.getElementById('thresholdValue');
+
+        const maxResultsSlider = document.getElementById('maxResultsSlider');
+        const maxResultsTrack = document.getElementById('maxResultsTrack');
+        const maxResultsThumb = document.getElementById('maxResultsThumb');
+        const maxResultsDisplay = document.getElementById('maxResultsValue');
+
+        let isDraggingThreshold = false;
+        let isDraggingMaxResults = false;
+
+        // Initialize sliders with config values
+        function initSliders() {
+            // Initialize threshold slider
+            const thresholdPercent = thresholdValue;
+            thresholdTrack.style.width = (thresholdPercent * 100) + '%';
+            thresholdThumb.style.left = (thresholdPercent * 100) + '%';
+            thresholdDisplay.textContent = thresholdValue.toFixed(2);
+
+            // Initialize max results slider (range 1-50, so normalize)
+            const maxResultsPercent = (maxResults - 1) / 49; // Map 1-50 to 0-1
+            maxResultsTrack.style.width = (maxResultsPercent * 100) + '%';
+            maxResultsThumb.style.left = (maxResultsPercent * 100) + '%';
+            maxResultsDisplay.textContent = maxResults;
+        }
+
+        // Threshold slider events
+        thresholdSlider.addEventListener('mousedown', (e) => {
+            isDraggingThreshold = true;
+            updateThreshold(e);
+        });
+
+        // Max results slider events
+        maxResultsSlider.addEventListener('mousedown', (e) => {
+            isDraggingMaxResults = true;
+            updateMaxResults(e);
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDraggingThreshold) updateThreshold(e);
+            if (isDraggingMaxResults) updateMaxResults(e);
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingThreshold = false;
+            isDraggingMaxResults = false;
+        });
+
+        function updateThreshold(e) {
+            const rect = thresholdSlider.getBoundingClientRect();
+            let percent = (e.clientX - rect.left) / rect.width;
+            percent = Math.max(0, Math.min(1, percent));
+            
+            thresholdValue = parseFloat(percent.toFixed(2));
+            
+            thresholdTrack.style.width = (percent * 100) + '%';
+            thresholdThumb.style.left = (percent * 100) + '%';
+            thresholdDisplay.textContent = thresholdValue.toFixed(2);
+        }
+
+        function updateMaxResults(e) {
+            const rect = maxResultsSlider.getBoundingClientRect();
+            let percent = (e.clientX - rect.left) / rect.width;
+            percent = Math.max(0, Math.min(1, percent));
+            
+            // Map 0-1 to 1-50 range
+            maxResults = Math.round(1 + percent * 49);
+            
+            maxResultsTrack.style.width = (percent * 100) + '%';
+            maxResultsThumb.style.left = (percent * 100) + '%';
+            maxResultsDisplay.textContent = maxResults;
+        }
+
+        // Refresh Embeddings Modal Functions
+        function showRefreshConfirmation() {
+            document.getElementById('refreshModal').classList.add('active');
+        }
+
+        function closeRefreshModal() {
+            document.getElementById('refreshModal').classList.remove('active');
+        }
+
+        async function confirmRefresh() {
+            closeRefreshModal();
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Refreshing embeddings cache... This may take 1-2 minutes.</div>
+                </div>
+            `;
+            
+            // Auto-scroll to results section
+            scrollToElement('results');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/refresh?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultsDiv.innerHTML = `
+                        <div class="success-message" style="padding: 30px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-radius: 20px; text-align: center;">
+                            <svg style="width: 64px; height: 64px; margin-bottom: 15px;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <h2 style="margin: 0 0 10px 0; font-size: 1.8rem;">Embeddings Refreshed!</h2>
+                            <p style="margin: 0; font-size: 1.1rem;">Search index has been rebuilt successfully.</p>
+                        </div>
+                    `;
+                    
+                    // Reload stats
+                    loadStats();
+                    
+                    // Clear success message after 5 seconds
+                    setTimeout(() => {
+                        resultsDiv.innerHTML = '';
+                    }, 5000);
+                } else {
+                    throw new Error(data.error || 'Failed to refresh embeddings');
+                }
+            } catch (error) {
+                console.error('Refresh error:', error);
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <h2>Error: Refresh Failed</h2>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Generate AI Summary Function
+        let currentSearchResults = null;
+        let currentSearchQuery = '';
+        let currentResultsHTML = '';  // Store the current results HTML
+
+        async function generateAISummary() {
+            if (!currentSearchResults || currentSearchResults.length === 0) {
+                alert('Please perform a search first!');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            
+            // Store current results HTML before showing loading
+            if (!currentResultsHTML) {
+                currentResultsHTML = resultsDiv.innerHTML;
+            }
+            
+            // Show loading above results
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Generating AI summary...</div>
+                </div>
+                ${currentResultsHTML}
+            `;
+            
+            // Auto-scroll to results section
+            scrollToElement('results');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/summary?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: currentSearchQuery,
+                        [ENTITY_NAME]: currentSearchResults
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Convert markdown to HTML
+                    const formattedSummary = markdownToHtml(data.summary);
+                    
+                    // Display AI summary above the existing results
+                    resultsDiv.innerHTML = `
+                        <div class="ai-summary" style="padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; line-height: 1.8; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3); margin-bottom: 30px;">
+                            <h2 style="margin: 0 0 20px 0; display: flex; align-items: center; gap: 12px;">
+                                <svg style="width: 32px; height: 32px;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M9 19C9 19.5304 9.21071 20.0391 9.58579 20.4142C9.96086 20.7893 10.4696 21 11 21H13C13.5304 21 14.0391 20.7893 14.4142 20.4142C14.7893 20.0391 15 19.5304 15 19M12 3C10.8181 3 9.64778 3.23279 8.55585 3.68508C7.46392 4.13738 6.47177 4.80031 5.63604 5.63604C3.94821 7.32387 3 9.61305 3 12C3 15.0902 4.71 17.206 6.34 18.6C7.01 19.148 7.5 19.5 7.5 19.5C7.5 19.5 8 20 8 21H16C16 20 16.5 19.5 16.5 19.5C16.5 19.5 16.99 19.148 17.66 18.6C19.29 17.206 21 15.0902 21 12C21 9.61305 20.0518 7.32387 18.364 5.63604C16.6761 3.94821 14.3869 3 12 3Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                AI Summary
+                            </h2>
+                            <div style="font-size: 1.05rem;">${formattedSummary}</div>
+                        </div>
+                        ${currentResultsHTML}
+                    `;
+                    
+                    // Hide the AI summary button after generating
+                    document.getElementById('aiSummaryBtn').style.display = 'none';
+                } else {
+                    throw new Error(data.error || 'Failed to generate summary');
+                }
+            } catch (error) {
+                console.error('Summary error:', error);
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <h2>Error: Summary Generation Failed</h2>
+                        <p>${error.message}</p>
+                    </div>
+                ` + currentResultsHTML;
+            }
+        }
+
+        // Handle Enter key
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                search();
+            }
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/stats?token=${encodeURIComponent(authToken)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Get stats keys dynamically from the response
+                    const stats = data.stats;
+                    const statsKeys = Object.keys(stats);
+                    
+                    let statsHTML = '';
+                    
+                    // Display up to 3 stats dynamically
+                    for (let i = 0; i < Math.min(3, statsKeys.length); i++) {
+                        const key = statsKeys[i];
+                        const value = stats[key];
+                        // Convert key to readable label (e.g., total_items -> Total Items)
+                        const label = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                        
+                        statsHTML += `
+                            <div class="stat-card">
+                                <div class="stat-number">${value}</div>
+                                <div class="stat-label">${label}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    document.getElementById('stats').innerHTML = statsHTML;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Search function
+        async function search() {
+            const query = document.getElementById('searchQuery').value.trim();
+            const resultsDiv = document.getElementById('results');
+            
+            if (!query) {
+                resultsDiv.innerHTML = '<div class="error">Please enter a search query</div>';
+                scrollToElement('results');
+                return;
+            }
+
+            // Show loading
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>{{ ui.loading_message }}</div>
+                </div>
+            `;
+            
+            // Auto-scroll to results section
+            scrollToElement('results');
+
+            // Build filters dynamically from ADVANCED_FILTERS configuration
+            const filters = {};
+            
+            ADVANCED_FILTERS.forEach(filterConfig => {
+                const filterId = filterConfig.id;
+                const fieldName = filterConfig.field_name;
+                let filterValue = '';
+                
+                if (filterConfig.type === 'text') {
+                    // Get value from text input
+                    filterValue = document.getElementById(filterId).value.trim();
+                } else if (filterConfig.type === 'select') {
+                    // Get value from selected dropdown (stored in selectedFilters)
+                    filterValue = selectedFilters[filterId] || '';
+                } else if (filterConfig.type === 'checkbox') {
+                    // Get value from checkbox
+                    filterValue = document.getElementById(filterId).checked ? 'true' : '';
+                }
+                
+                // Only add non-empty filters to request
+                if (filterValue) {
+                    filters[fieldName] = filterValue;
+                }
+            });
+
+            try {
+                const response = await fetch(`${API_BASE}/api/search?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        top_k: maxResults,
+                        threshold: thresholdValue,
+                        filters: filters
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+
+                if (data.count === 0) {
+                    resultsDiv.innerHTML = `
+                        <div class="no-results">
+                            <svg class="icon-large" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9.17218 14.8284L14.8289 9.17157M21 21L16.65 16.65M19 11C19 15.4183 15.4183 19 11 19C6.58172 19 3 15.4183 3 11C3 6.58172 6.58172 3 11 3C15.4183 3 19 6.58172 19 11Z" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <h2>{{ ui.no_results_title }}</h2>
+                            <p>{{ ui.no_results_message }}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Store results for AI summary
+                currentSearchResults = data.results;
+                currentSearchQuery = query;
+                currentResultsHTML = '';  // Reset stored HTML for new search
+
+                // Show/hide AI summary button based on format
+                const aiSummaryBtn = document.getElementById('aiSummaryBtn');
+                if (selectedFormat === 'ai_summary') {
+                    aiSummaryBtn.style.display = 'none';
+                } else {
+                    aiSummaryBtn.style.display = 'inline-flex';
+                }
+
+                // Display results based on format
+                if (selectedFormat === 'ai_summary') {
+                    await displayAISummary(data.results, query);
+                } else if (selectedFormat === 'brief') {
+                    displayBriefSummary(data.results);
+                } else if (selectedFormat === 'table') {
+                    displayTableView(data.results);
+                } else {
+                    displayDetailedCards(data.results);
+                }
+                
+                // Store the rendered results HTML after display
+                currentResultsHTML = document.getElementById('results').innerHTML;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Display functions for different formats
+        
+        // Helper function to build a single card dynamically from FIELD_MAP
+        function buildCard(item, index, score) {
+            const scoreClass = score >= 0.5 ? 'score-excellent' : score >= 0.3 ? 'score-good' : 'score-fair';
+            
+            // Format notes for better readability
+            let formattedNotes = '';
+            if (item.notes_raw && item.notes_raw.length > 0) {
+                // Sort notes by timestamp descending (newest first) to ensure correct order
+                const sortedNotes = [...item.notes_raw].sort((a, b) => {
+                    return new Date(b.timestamp) - new Date(a.timestamp);
+                });
+                
+                formattedNotes = sortedNotes.map((note, idx) => {
+                    const date = new Date(note.timestamp).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+                    const marker = idx === 0 ? '▶ Latest' : idx === sortedNotes.length - 1 ? '▪ Oldest' : '▪';
+                    return `<div style="margin-bottom: 8px;"><strong>${marker}</strong> <span style="color: #666; font-size: 0.85em;">[${date}]</span><br/>${note.comment}</div>`;
+                }).join('');
+            } else if (item.notes) {
+                formattedNotes = item.notes;
+            }
+            
+            // Build details dynamically from FIELD_MAP configuration
+            let detailsHTML = '';
+            
+            // Iterate through CARD_DISPLAY_INDICES to get fields to display
+            CARD_DISPLAY_INDICES.forEach(fieldIndex => {
+                const fieldConfig = FIELD_MAP[fieldIndex];
+                if (!fieldConfig) return;
+                
+                const fieldName = fieldConfig.name;
+                const label = fieldConfig.label;
+                const iconFile = fieldConfig.icon || 'file-text.svg';
+                const iconPath = `/static/icons/${iconFile}`;
+                let value = item[fieldName];
+                
+                // Skip empty values
+                if (!value || value === 'N/A' || value === '') {
+                    return;
+                }
+                
+                // Handle special field types if configured
+                if (fieldConfig.type === 'boolean' || fieldConfig.type === 'yes_no') {
+                    value = value === 'Y' || value === 'yes' || value === true ? 'Yes' : 'No';
+                }
+                
+                // Check if this field should be combined with another field
+                if (fieldConfig.combine_with) {
+                    const combineFieldIndex = fieldConfig.combine_with;
+                    const combineFieldConfig = FIELD_MAP[combineFieldIndex];
+                    if (combineFieldConfig) {
+                        const combineValue = item[combineFieldConfig.name];
+                        if (combineValue && combineValue !== 'N/A' && combineValue !== '') {
+                            value = `${value}, ${combineValue}`;
+                        }
+                    }
+                }
+                
+                // Skip notes field here, handled separately below
+                if (fieldConfig.name === 'notes') {
+                    return;
+                }
+                
+                detailsHTML += `
+                    <div class="detail-item">
+                        <div class="detail-label">
+                            <img src="${iconPath}" class="icon" style="width: 18px; height: 18px; margin-right: 8px; vertical-align: middle;" alt="">
+                            ${label}
+                        </div>
+                        <div class="detail-value">${value}</div>
+                    </div>`;
+            });
+            
+            // Get primary field for card title
+            const primaryFieldConfig = FIELD_MAP[PRIMARY_DISPLAY_INDEX];
+            const primaryFieldName = primaryFieldConfig ? primaryFieldConfig.name : Object.keys(item)[0];
+            const primaryIconFile = primaryFieldConfig ? primaryFieldConfig.icon : 'building.svg';
+            const primaryIconPath = `/static/icons/${primaryIconFile}`;
+            const cardTitle = item[primaryFieldName] || 'N/A';
+            
+            return `
+                <div class="result-card">
+                    <div class="result-header">
+                        <div>
+                            <span class="rank">#${index + 1}</span>
+                            <span class="result-title">
+                                <img src="${primaryIconPath}" class="icon" style="width: 20px; height: 20px; margin-right: 8px; vertical-align: middle;" alt="">
+                                ${cardTitle}
+                            </span>
+                        </div>
+                        <span class="score-badge ${scoreClass}">${(score * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="result-details">
+                        ${detailsHTML}
+                    </div>
+                    ${formattedNotes ? `<div class="notes" style="line-height: 1.6;">${formattedNotes}</div>` : ''}
+                </div>
+            `;
+        }
+        
+        function displayDetailedCards(results) {
+            const resultsDiv = document.getElementById('results');
+            const resultsHTML = results.map((item, index) => {
+                return buildCard(item, index, item.similarity_score);
+            }).join('');
+            resultsDiv.innerHTML = resultsHTML;
+        }
+
+        function displayBriefSummary(results) {
+            const resultsDiv = document.getElementById('results');
+            
+            // Get primary field from FIELD_MAP
+            const primaryFieldConfig = FIELD_MAP[PRIMARY_DISPLAY_INDEX];
+            const primaryFieldName = primaryFieldConfig ? primaryFieldConfig.name : Object.keys(results[0])[0];
+            
+            // Try to find a secondary field for display from card display indices
+            // Use the second field in CARD_DISPLAY_INDICES if available
+            let secondaryFieldName = null;
+            if (CARD_DISPLAY_INDICES.length > 1) {
+                const secondaryIndex = CARD_DISPLAY_INDICES[1];
+                const secondaryConfig = FIELD_MAP[secondaryIndex];
+                if (secondaryConfig) {
+                    secondaryFieldName = secondaryConfig.name;
+                }
+            }
+            
+            let summaryHTML = '<div style="background: white; padding: 30px; border-radius: 15px; font-family: monospace; white-space: pre-wrap;">';
+            results.forEach((item, index) => {
+                const score = (item.similarity_score * 100).toFixed(1);
+                const primaryValue = item[primaryFieldName] || 'N/A';
+                const secondaryValue = secondaryFieldName ? (item[secondaryFieldName] || '') : '';
+                const secondaryDisplay = secondaryValue ? ` - ${secondaryValue}` : '';
+                summaryHTML += `${index + 1}. ${primaryValue}${secondaryDisplay} (${score}%)\n`;
+            });
+            summaryHTML += '</div>';
+            resultsDiv.innerHTML = summaryHTML;
+        }
+
+        function displayTableView(results) {
+            const resultsDiv = document.getElementById('results');
+            
+            // Get first 4 fields to display in table from CARD_DISPLAY_INDICES
+            const tableFields = CARD_DISPLAY_INDICES.slice(0, 4).map(index => {
+                const config = FIELD_MAP[index];
+                return config ? { name: config.name, label: config.label } : null;
+            }).filter(f => f !== null);
+            
+            let tableHTML = `
+                <div style="background: white; padding: 30px; border-radius: 15px; overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <th style="padding: 15px; text-align: left;">#</th>`;
+            
+            // Add column headers dynamically
+            tableFields.forEach(field => {
+                tableHTML += `<th style="padding: 15px; text-align: left;">${field.label}</th>`;
+            });
+            
+            tableHTML += `
+                                <th style="padding: 15px; text-align: left;">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            results.forEach((item, index) => {
+                const score = (item.similarity_score * 100).toFixed(1);
+                tableHTML += `
+                    <tr style="border-bottom: 1px solid #dadce0;">
+                        <td style="padding: 15px;">${index + 1}</td>`;
+                
+                // Add field values dynamically
+                tableFields.forEach(field => {
+                    const value = item[field.name] || 'N/A';
+                    const weight = field === tableFields[0] ? 'font-weight: 600;' : '';
+                    tableHTML += `<td style="padding: 15px; ${weight}">${value}</td>`;
+                });
+                
+                tableHTML += `
+                        <td style="padding: 15px;"><strong>${score}%</strong></td>
+                    </tr>
+                `;
+            });
+            tableHTML += '</tbody></table></div>';
+            resultsDiv.innerHTML = tableHTML;
+        }
+
+        async function displayAISummary(results, query) {
+            const resultsDiv = document.getElementById('results');
+            
+            // Build AI summary container with loading spinner
+            let htmlContent = `
+                <div class="ai-summary" id="aiSummaryBox" style="padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; line-height: 1.8; box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3); margin-bottom: 30px;">
+                    <h2 style="margin: 0 0 20px 0; display: flex; align-items: center; gap: 12px;">
+                        <svg style="width: 32px; height: 32px;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 19C9 19.5304 9.21071 20.0391 9.58579 20.4142C9.96086 20.7893 10.4696 21 11 21H13C13.5304 21 14.0391 20.7893 14.4142 20.4142C14.7893 20.0391 15 19.5304 15 19M12 3C10.8181 3 9.64778 3.23279 8.55585 3.68508C7.46392 4.13738 6.47177 4.80031 5.63604 5.63604C3.94821 7.32387 3 9.61305 3 12C3 15.0902 4.71 17.206 6.34 18.6C7.01 19.148 7.5 19.5 7.5 19.5C7.5 19.5 8 20 8 21H16C16 20 16.5 19.5 16.5 19.5C16.5 19.5 16.99 19.148 17.66 18.6C19.29 17.206 21 15.0902 21 12C21 9.61305 20.0518 7.32387 18.364 5.63604C16.6761 3.94821 14.3869 3 12 3Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        AI Summary
+                    </h2>
+                    <div id="aiSummaryContent" style="font-size: 1.05rem;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div class="spinner" style="border-color: rgba(255,255,255,0.3); border-top-color: white; width: 30px; height: 30px;"></div>
+                            <div>Generating AI summary...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add each card separately (same as detailed cards format)
+            results.forEach((item, index) => {
+                htmlContent += buildCard(item, index, item.similarity_score);
+            });
+            
+            // Display the cards immediately
+            resultsDiv.innerHTML = htmlContent;
+            
+            // Auto-scroll to show AI summary box after cards are rendered
+            setTimeout(() => {
+                const aiSummaryBox = document.getElementById('aiSummaryBox');
+                if (aiSummaryBox) {
+                    aiSummaryBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+            
+            // Now fetch AI summary asynchronously and update just that section
+            try {
+                const response = await fetch(`${API_BASE}/api/summary?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        [ENTITY_NAME]: results,
+                        query: query
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+
+                // Convert markdown to HTML for summary
+                const formattedSummary = markdownToHtml(data.summary);
+
+                // Update only the AI summary content section
+                const summaryContentDiv = document.getElementById('aiSummaryContent');
+                if (summaryContentDiv) {
+                    summaryContentDiv.innerHTML = `<div style="font-size: 1.05rem;">${formattedSummary}</div>`;
+                }
+
+            } catch (error) {
+                // Update summary section with error
+                const summaryContentDiv = document.getElementById('aiSummaryContent');
+                if (summaryContentDiv) {
+                    summaryContentDiv.innerHTML = `<div style="color: #ffcccc;">Error generating summary: ${error.message}</div>`;
+                }
+            }
+        }        // Voice recording with OpenAI Whisper API
+        let isRecording = false;
+        let recordingStartTime = 0;
+        let audioContext;
+        let analyser;
+        let microphone;
+        let animationId;
+        let mediaStream;
+        let mediaRecorder;
+        let audioChunks = [];
+        const MIN_RECORDING_DURATION = 500; // milliseconds
+
+        function startVoiceRecording() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            console.log('[Audio] Starting audio recording with Whisper API...');
+            recordingStartTime = Date.now();
+            
+            // Start waveform visualization and recording
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    console.log('[Audio] Microphone access granted');
+                    mediaStream = stream;
+                    audioChunks = [];
+                    
+                    // Create MediaRecorder to capture audio
+                    mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm'
+                    });
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+                    
+                    mediaRecorder.onstop = async () => {
+                        console.log('[Audio] Sending audio to Whisper Translation API...');
+                        
+                        // Create audio blob
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        
+                        // Show loading indicator
+                        const resultsDiv = document.getElementById('results');
+                        resultsDiv.innerHTML = `
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <div>Processing audio with AI...</div>
+                                <div>Translating Tamil/Hindi to English...</div>
+                            </div>
+                        `;
+                        
+                        // Send to backend for transcription
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'recording.webm');
+                        
+                        try {
+                            const response = await fetch(`${API_BASE}/api/transcribe?token=${encodeURIComponent(authToken)}`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                                const transcript = data.text;
+                                console.log('[Audio] Translated to English:', transcript);
+                                console.log('[Audio] Source language detected:', data.language);
+                                
+                                // Check if transcript is empty or whitespace
+                                if (!transcript || transcript.trim() === '') {
+                                    // Show try again message
+                                    resultsDiv.innerHTML = `
+                                        <div class="error" style="padding: 30px; text-align: center;">
+                                            <svg style="width: 64px; height: 64px; margin-bottom: 15px; color: #f5576c;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M12 9V11M12 15H12.01M5.07183 19H18.9282C20.4678 19 21.4301 17.3333 20.6603 16L13.7321 4C12.9623 2.66667 11.0378 2.66667 10.268 4L3.33978 16C2.56998 17.3333 3.53223 19 5.07183 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                            <h3 style="margin: 10px 0;">No Speech Detected</h3>
+                                            <p style="color: #666; margin-bottom: 20px;">We couldn't hear you. Please speak clearly and try again.</p>
+                                            <button onclick="this.parentElement.remove()" style="padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600;">
+                                                Try Again
+                                            </button>
+                                        </div>
+                                    `;
+                                } else {
+                                    // Set query
+                                    document.getElementById('searchQuery').value = transcript;
+                                    
+                                    // Update loading message
+                                    resultsDiv.innerHTML = `
+                                        <div class="loading">
+                                            <div class="spinner"></div>
+                                            <div>Translated: "${transcript}"</div>
+                                            <div>Searching ${ENTITY_NAME}...</div>
+                                        </div>
+                                    `;
+                                    
+                                    // Automatically search
+                                    setTimeout(() => search(), 500);
+                                }
+                            } else {
+                                throw new Error(data.user_message || data.error || 'Translation failed');
+                            }
+                        } catch (error) {
+                            console.error('[Audio] Translation error:', error);
+                            // Use user-friendly message
+                            const errorMsg = error.message.includes('user_message') 
+                                ? error.message 
+                                : 'Voice recognition failed. Please try again.';
+                            
+                            resultsDiv.innerHTML = `
+                                <div class="error" style="padding: 30px; text-align: center;">
+                                    <svg style="width: 64px; height: 64px; margin-bottom: 15px; color: #f5576c;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 9V11M12 15H12.01M5.07183 19H18.9282C20.4678 19 21.4301 17.3333 20.6603 16L13.7321 4C12.9623 2.66667 11.0378 2.66667 10.268 4L3.33978 16C2.56998 17.3333 3.53223 19 5.07183 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    <h3 style="margin: 10px 0;">Voice Recording Failed</h3>
+                                    <p style="color: #666; margin-bottom: 20px;">${errorMsg}</p>
+                                    <button onclick="this.parentElement.remove()" style="padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600;">
+                                        Try Again
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    };
+                    
+                    // Start recording
+                    mediaRecorder.start();
+                    isRecording = true;
+                    
+                    // Create audio context for waveform
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    microphone = audioContext.createMediaStreamSource(stream);
+                    
+                    analyser.fftSize = 128;
+                    microphone.connect(analyser);
+                    
+                    // Show visualizer
+                    const visualizer = document.getElementById('audioVisualizer');
+                    visualizer.style.display = 'block';
+                    visualizer.innerHTML = '';
+                    
+                    // Create waveform bars
+                    const barCount = 60;
+                    for (let i = 0; i < barCount; i++) {
+                        const bar = document.createElement('div');
+                        bar.className = 'waveform-bar';
+                        bar.style.left = `${(i / barCount) * 100}%`;
+                        bar.style.width = `${(100 / barCount) * 0.7}%`;
+                        visualizer.appendChild(bar);
+                    }
+                    
+                    // Show recording indicator
+                    document.getElementById('recordingIndicator').style.display = 'block';
+                    
+                    // Change button style
+                    const voiceBtn = document.getElementById('voiceBtn');
+                    voiceBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #ff6b6b 100%)';
+                    voiceBtn.innerHTML = `
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="6" y="4" width="4" height="16" fill="white" rx="1"/>
+                            <rect x="14" y="4" width="4" height="16" fill="white" rx="1"/>
+                        </svg>
+                        Stop
+                    `;
+                    
+                    // Start animation
+                    animateWaveform();
+                })
+                .catch(err => {
+                    console.error('[Audio] Error accessing microphone:', err);
+                    alert('Could not access microphone. Please check your permissions.\n\nError: ' + err.message);
+                });
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+            
+            // Check minimum recording duration
+            const recordingDuration = Date.now() - recordingStartTime;
+            if (recordingDuration < MIN_RECORDING_DURATION) {
+                console.log('[Audio] Recording too short, continuing...');
+                // Show feedback to user
+                const indicator = document.getElementById('recordingIndicator');
+                indicator.innerHTML = 'Keep talking... (min 0.5s)';
+                setTimeout(() => {
+                    indicator.innerHTML = 'Recording...';
+                }, 500);
+                return;
+            }
+            
+            console.log('[Audio] Stopping recording...');
+            isRecording = false;
+            
+            // Stop media recorder
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            
+            // Stop waveform animation
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            // Stop microphone
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            
+            if (microphone) {
+                microphone.disconnect();
+                microphone = null;
+            }
+            
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            
+            analyser = null;
+            
+            // Hide visualizer and indicator
+            document.getElementById('audioVisualizer').style.display = 'none';
+            document.getElementById('recordingIndicator').style.display = 'none';
+            
+            // Reset button
+            const voiceBtn = document.getElementById('voiceBtn');
+            voiceBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            voiceBtn.innerHTML = `
+                <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 1C10.34 1 9 2.34 9 4V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V4C15 2.34 13.66 1 12 1Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10M12 19V23M8 23H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Voice
+            `;
+        }
+
+        function animateWaveform() {
+            if (!analyser || !isRecording) return;
+            
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            
+            const bars = document.querySelectorAll('.waveform-bar');
+            const step = Math.floor(dataArray.length / bars.length);
+            
+            bars.forEach((bar, index) => {
+                const value = dataArray[index * step];
+                const height = (value / 255) * 90 + 10; // 10-100% height
+                bar.style.height = `${height}%`;
+            });
+            
+            animationId = requestAnimationFrame(animateWaveform);
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.select-wrapper') && !event.target.closest('.custom-filter-select')) {
+                document.querySelectorAll('.select-dropdown').forEach(dropdown => {
+                    dropdown.classList.remove('active');
+                    const prevBtn = dropdown.previousElementSibling;
+                    if (prevBtn && prevBtn.classList.contains('select-button')) {
+                        prevBtn.classList.remove('active');
+                    }
+                });
+            }
+        });
+
+        // Close modal when clicking outside or pressing ESC
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('refreshModal');
+            if (event.target === modal) {
+                closeRefreshModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeRefreshModal();
+            }
+        });
+    </script>
+</body>
+</html>

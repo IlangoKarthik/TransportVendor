@@ -1,0 +1,134 @@
+Aadhaar Authentication API
+1. Introduction
+The Unique Identification Authority of India (UIDAI) has been created, with the
+mandate of providing a Unique Identity (Aadhaar) to all Indian residents. The UIDAI
+provides online authentication to verify the identity claim of the Aadhaar number
+holder.
+Aadhaar “authentication” means the process wherein Aadhaar Number or Virtual ID or
+UID Token, along with other attributes, including biometrics, are submitted to the
+Central Identities Data Repository (CIDR) for its verification on the basis of information
+or data or documents available with it. UIDAI provides an online service to support this
+process. Aadhaar authentication service only responds with a “yes/no” and no personal
+identity information is returned as part of the response.
+1.1 Target Audience and Pre-Requisites
+This is a technical document and is targeted at software professionals working in
+technology domain and interested in incorporating Aadhaar authentication into their
+applications.
+Readers should also read the following API related documents for complete
+understanding.
+1. Aadhaar OTP Request API -
+https://uidai.gov.in/ecosystem/authentication-devices-documents/
+authentication-documents.html
+2. Aadhaar Registered Devices Specification -
+https://uidai.gov.in/ecosystem/authentication-devices-documents/
+authentication-documents.html
+3. Aadhaar e-KYC API - https://uidai.gov.in/ecosystem/authentication-devices-
+documents/authentication-documents.html
+1.2 Terminology
+Authentication User Agency (AUA) and Sub-AUA: An organization or an entity using
+Aadhaar authentication as part of its applications to provide services to Aadhaar
+number holders. Examples include Government Departments, Banks, and other public
+or private organizations. All AUAs(Authentication User Agencies) must be registered
+within Aadhaar authentication server to perform secure authentication. Sub-AUA is an
+entity having a business relationship with AUA offering specific services in a particular
+domain.
+© UIDAI, 2022 http://uidai.gov.in/ Page 3 of 34
+Version 2.5 (Revision 1) Aadhaar Authentication API
+Authentication Service Agency (ASA): An organization or an entity providing
+connectivity using private secure network to UIDAI’s data centres for transmitting
+authentication requests from various AUAs.
+Authentication Factors: Aadhaar authentication supports authentication using
+multiple factors. These factors include demographic data, biometric data, PIN, OTP,
+possession of mobile, or combinations thereof. Adding multiple factors increases the
+strength of authentication. Applications using Aadhaar authentication need to choose
+appropriate authentication factors based on risk level of the transaction. AUAs can add
+their own factors to strengthen authentication.
+1.3 Legal Framework
+The Aadhaar (Targeted Delivery of Financial and Other Subsidies, Benefits and Services)
+Act 2016was published in gazette notification on March 26, 2016. The Act is to provide
+for, as a good governance, efficient, transparent, and targeted delivery of subsidies,
+benefits and services to Aadhaar Number holders. A gazette notification was issued by
+Central Government on 12th July 2016 to establish UIDAI as an Authority and
+operationalize certain provisions of Aadhaar Act 2016. Authentication regulations are
+also published under this Act. These documents specify legal framework for
+authentication usage, AUA/ASA engagements, audits, and other details. Detailed partner
+documents are also published. These documents are available at
+https://uidai.gov.in/ecosystem/authentication-devices-documents/authentication-
+documents.html
+1.4 Objective of this document
+This document provides Aadhaar Authentication API (Application Programming
+Interface) specification. It contains details including API data format, protocol, and
+security specifications.
+For latest documents related to Aadhaar authentication, partner guidelines, other APIs,
+and related documents, see https://uidai.gov.in/ecosystem/authentication-devices-
+documents/authentication-documents.html
+© UIDAI, 2022 http://uidai.gov.in/ Page 4 of 34
+Version 2.5 (Revision 1) Aadhaar Authentication API
+2. Understanding Aadhaar Authentication
+This chapter describes Aadhaar authentication, some of the envisioned usage scenarios,
+and working details. Technical details follow in subsequent chapters.
+2.1 Aadhaar Number
+The Unique Identification (Aadhaar) Number gives individuals the means to clearly
+establish their identity to public and private agencies across the country. Three key
+characteristics of Aadhaar number are:
+1. Permanency (Aadhaar number remains same during lifetime of the person)
+2. Uniqueness (one Aadhaar number holder has one ID and no two Aadhaar
+number holders have same ID)
+3. Global (same identifier can be used across applications and domains)
+Aadhaar number is provided during the initiation process called enrolment where
+his/her demographic and biometric information are collected and uniqueness of the
+provided data is established through a process called de-duplication. Post de-
+duplication, an Aadhaar number is issued and a letter is sent to Aadhaar number holder
+informing the details.
+2.2 Virtual Identity (VID) Number and UID Token
+Virtual ID is a temporary, revocable 16-digit random number mapped with the Aadhaar
+number. VID can be used in lieu of Aadhaar number whenever authentication or e-KYC
+services are performed. Residents are currently required to share Aadhaar Number to
+authenticate their identity to avail various services. With the introduction of Virtual ID,
+a fungible number mapped to Aadhaar Number, residents have an option to share their
+Virtual ID at the time of authentication instead of Aadhaar number to further improve
+privacy.
+UID Token is returned as part of every authentication which is the unique token for that
+Aadhaar number holder within that agency. Agencies should use UID token to seed their
+database and map to their customer/beneficiary data. This Token will be unique for
+each Aadhaar number for a particular entity (AUA/Sub-AUA). This Token will remain
+same for an Aadhaar number for all authentication requests by that particular entity.
+However, for a particular Aadhaar Number, different AUAs/Sub-AUAs will have
+different UID Tokens. The UID Token is an alphanumeric string meant only for system
+usage.
+More about VID and UID Token are available on UIDAI website. From this document
+perspective, it is important to note that VID or UID Token can be used in lieu of Aadhaar
+© UIDAI, 2022 http://uidai.gov.in/ Page 5 of 34
+Version 2.5 (Revision 1) Aadhaar Authentication API
+number within authentication request. In addition, authentication response contains
+the UID Token for whom authentication was done so that agencies can store that within
+their database or audits.
+2.3 Aadhaar Authentication at a Glance
+Aadhaar authentication is the process wherein Aadhaar Number (wherever Aadhaar
+number is used, in future, an encrypted Aadhaar number may also be used) or Virtual ID
+or UID Token, along with other attributes, including biometrics, are submitted online to
+the CIDR for its verification on the basis of information or data or documents available
+with it.
+
+In all forms of authentication the Aadhaar Number/Virtual ID/UID Token needs to
+be submitted so that authentication is reduced to a 1:1 match. In addition, Aadhaar
+authentication service only responds with a “yes/no” and no Personal Identity
+Information (PII) is returned as part of the response.
+Aadhaar authentication provides several ways in which an Aadhaar number holder can
+authenticate themselves using the system. At a high level, authentication can be using
+Demographics data and/or Biometric (FP/Iris/Face) data, and/or OTP.
+During the authentication transaction, the Aadhaar number holder’s record is first
+selected using the Aadhaar Number/Virtual ID/UID Token and then the
+demographic/biometric inputs are matched against the stored data within CIDR which
+was provided by the Aadhaar number holder during enrolment/update process.
+2.4 Aadhaar Authentication Usage
+Aadhaar authentication enables agencies to verify identity of Aadhaar number holders
+using the UIDAI authentication service that is only made available via a private secure
+network. Aadhaar authentication service provides services to instantly verify the
+identity of the Aadhaar number holder against the available data in CIDR. Based on the
+needs of the service, different factors could be used along with Aadhaar Number/Virtual
+ID/UID Token. These factors could be combination of biometrics (such as fingerprints,
+iris, face impressions) and/or demographic information (such as Name, Date of birth,
+Address)and/or a secret PIN (currently not implemented) or OTP (One Time Pin).
+For further details on usage of Aadhaar in various service delivery scenarios, refer to
+“Aadhaar Enabled Service Delivery” White Paper published on UIDAI website.

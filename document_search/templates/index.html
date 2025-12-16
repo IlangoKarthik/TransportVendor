@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ui.page_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.file_text) }}" class="icon-large" alt="Logo">
+                    {{ ui.main_heading }}
+                </h1>
+                <!-- Upload link handled by React navigation -->
+            </div>
+            <p class="subtitle">{{ ui.subtitle }}</p>
+        </header>
+
+        <!-- Statistics -->
+        <div class="stats" id="stats"></div>
+
+        <!-- Search Box -->
+        <div class="search-box">
+            <div class="search-input-group">
+                <input 
+                    type="text" 
+                    id="searchQuery" 
+                    placeholder="{{ ui.search_placeholder }}"
+                    onkeypress="handleEnter(event)"
+                >
+                <button onclick="toggleVoiceRecording()" id="voiceBtn" class="voice-btn" title="Voice search">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.microphone) }}" class="icon" alt="Voice" id="voiceIcon">
+                </button>
+                <button onclick="search()" id="searchBtn">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.search) }}" class="icon" alt="Search">
+                    {{ ui.search_button }}
+                </button>
+            </div>
+
+            <!-- Audio Visualizer -->
+            <canvas id="audioVisualizer" style="display: none;"></canvas>
+            <div class="recording-indicator" id="recordingIndicator" style="display: none;">
+                <img src="{{ url_for('static', filename='icons/' + ui.icons.recording_dot) }}" class="icon" alt="Recording">
+                Recording... Speak now
+            </div>
+
+            <!-- Utility Buttons -->
+            <div class="utility-buttons" style="margin-bottom: 15px;">
+                <button onclick="showRefreshConfirmation()" class="utility-btn refresh-btn" title="Refresh embeddings cache">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.refresh) }}" class="icon" alt="Refresh">
+                    Refresh Embeddings
+                </button>
+                <button onclick="generateAISummary()" id="aiSummaryBtn" class="utility-btn ai-summary-btn" style="display: none;" title="Generate AI summary of results">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.sparkles) }}" class="icon" alt="AI Summary">
+                    {{ ui.generate_summary_button }}
+                </button>
+            </div>
+
+            <!-- Advanced Filters -->
+            <details>
+                <summary>
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.filter) }}" class="icon" style="display: inline-block; margin-right: 8px;" alt="Filter">
+                    Advanced Filters
+                </summary>
+                <div class="filters">
+                    <!-- Custom Threshold Slider -->
+                    <div class="custom-range">
+                        <label>{{ ui.filter_threshold_label }}</label>
+                        <div class="range-container">
+                            <div class="range-slider" id="thresholdSlider">
+                                <div class="range-track" id="thresholdTrack"></div>
+                                <div class="range-thumb" id="thresholdThumb"></div>
+                            </div>
+                            <div class="range-value" id="thresholdValue"></div>
+                        </div>
+                    </div>
+
+                    <!-- Max Results Slider -->
+                    <div class="custom-range">
+                        <label>{{ ui.filter_max_results_label }}</label>
+                        <div class="range-container">
+                            <div class="range-slider" id="maxResultsSlider">
+                                <div class="range-track" id="maxResultsTrack"></div>
+                                <div class="range-thumb" id="maxResultsThumb"></div>
+                            </div>
+                            <div class="range-value" id="maxResultsValue"></div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="results-container"></div>
+    </div>
+
+    <!-- Refresh Confirmation Modal -->
+    <div class="modal-overlay" id="refreshModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <img src="{{ url_for('static', filename='icons/' + ui.icons.alert_circle) }}" alt="Alert">
+                <h3>Refresh Embeddings?</h3>
+            </div>
+            <div class="modal-body">
+                <p>This will rebuild the search index from your uploaded documents. This process may take 1-2 minutes.</p>
+                <div class="info-text">
+                    <strong>When to refresh:</strong><br>
+                    • After uploading new documents<br>
+                    • When search results seem outdated<br>
+                    • If documents were modified externally
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" onclick="closeRefreshModal()">Cancel</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmRefresh()">Yes, Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Viewer Modal -->
+    <div class="modal-overlay" id="documentViewerModal">
+        <div class="modal-content document-viewer">
+            <div class="modal-header">
+                <h3 id="viewerTitle">Document Viewer</h3>
+                <button class="modal-close-btn" onclick="closeDocumentViewer()">×</button>
+            </div>
+            <div class="modal-body">
+                <iframe id="documentFrame" style="width: 100%; height: 70vh; border: none; border-radius: 10px;"></iframe>
+            </div>
+            <div class="modal-actions">
+                <a href="#" id="downloadLinkInViewer" class="modal-btn modal-btn-confirm" download>Download</a>
+                <button class="modal-btn modal-btn-cancel" onclick="closeDocumentViewer()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        let thresholdValue = {{ similarity_threshold }};
+        let maxResults = {{ max_results }};
+        
+        // Extract token from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const authToken = urlParams.get('token');
+        
+        // UI text configuration
+        const UI_TEXT = {{ ui | tojson }};
+        const ENTITY_NAME = UI_TEXT.entity_name || 'documents';
+        const ENTITY_NAME_SINGULAR = UI_TEXT.entity_name_singular || 'document';
+
+        // Initialize sliders on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initThresholdSlider();
+            initMaxResultsSlider();
+            loadStats();
+            initVoiceRecognition();
+        });
+
+        // Voice Recognition Variables
+        let isRecording = false;
+        let recordingStartTime = 0;
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let animationId = null;
+        let mediaStream = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        const MIN_RECORDING_DURATION = 500; // milliseconds
+
+        // Initialize Voice Recognition (remove old SpeechRecognition code)
+        function initVoiceRecognition() {
+            // Check if getUserMedia is supported
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.warn('Voice recording not supported');
+                document.getElementById('voiceBtn').style.display = 'none';
+            }
+        }
+
+        // Toggle Voice Recording
+        function toggleVoiceRecording() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            console.log('[Audio] Starting audio recording with Whisper API...');
+            recordingStartTime = Date.now();
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    console.log('[Audio] Microphone access granted');
+                    mediaStream = stream;
+                    audioChunks = [];
+
+                    // Create MediaRecorder to capture audio
+                    mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm'
+                    });
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        console.log('[Audio] Sending audio to Whisper Translation API...');
+
+                        // Create audio blob
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+                        // Show loading indicator
+                        const resultsDiv = document.getElementById('results');
+                        resultsDiv.innerHTML = `
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <div>Processing audio with AI...</div>
+                            </div>
+                        `;
+
+                        // Send to backend for transcription
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'recording.webm');
+
+                        try {
+                            const response = await fetch(`${API_BASE}/api/transcribe?token=${encodeURIComponent(authToken)}`, {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                const transcript = data.text;
+                                console.log('[Audio] Translated to English:', transcript);
+                                console.log('[Audio] Source language detected:', data.language);
+
+                                // Check if transcript is empty or whitespace
+                                if (!transcript || transcript.trim() === '') {
+                                    resultsDiv.innerHTML = `
+                                        <div class="error">
+                                            <h3>No Speech Detected</h3>
+                                            <p>Please try again and speak clearly.</p>
+                                        </div>
+                                    `;
+                                } else {
+                                    // Set query
+                                    document.getElementById('searchQuery').value = transcript;
+
+                                    // Update loading message
+                                    resultsDiv.innerHTML = `
+                                        <div class="loading">
+                                            <div class="spinner"></div>
+                                            <div>Searching for: "${transcript}"</div>
+                                        </div>
+                                    `;
+
+                                    // Automatically search
+                                    setTimeout(() => search(), 500);
+                                }
+                            } else {
+                                throw new Error(data.user_message || data.error || 'Translation failed');
+                            }
+                        } catch (error) {
+                            console.error('[Audio] Translation error:', error);
+                            const errorMsg = error.message || 'Voice recognition failed. Please try again.';
+
+                            resultsDiv.innerHTML = `
+                                <div class="error">
+                                    <h3>Voice Recognition Failed</h3>
+                                    <p>${errorMsg}</p>
+                                </div>
+                            `;
+                        }
+                    };
+
+                    // Start recording
+                    mediaRecorder.start();
+
+                    // Setup audio visualizer
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    microphone = audioContext.createMediaStreamSource(stream);
+                    microphone.connect(analyser);
+                    analyser.fftSize = 256;
+
+                    // Setup canvas for waveform
+                    const visualizer = document.getElementById('audioVisualizer');
+                    visualizer.style.display = 'block';
+                    const canvasCtx = visualizer.getContext('2d');
+                    visualizer.width = visualizer.offsetWidth;
+                    visualizer.height = 120;
+
+                    // Show recording indicator
+                    document.getElementById('recordingIndicator').style.display = 'block';
+
+                    // Change button style
+                    const voiceBtn = document.getElementById('voiceBtn');
+                    voiceBtn.style.background = 'linear-gradient(135deg, #ea4335 0%, #ff6b6b 100%)';
+                    voiceBtn.innerHTML = `
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 1C10.34 1 9 2.34 9 4V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V4C15 2.34 13.66 1 12 1Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10M12 19V23M8 23H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Stop
+                    `;
+
+                    isRecording = true;
+                    
+                    // Animate waveform
+                    function animate() {
+                        if (!isRecording) return;
+
+                        const bufferLength = analyser.frequencyBinCount;
+                        const dataArray = new Uint8Array(bufferLength);
+                        analyser.getByteFrequencyData(dataArray);
+
+                        canvasCtx.clearRect(0, 0, visualizer.width, visualizer.height);
+
+                        // Limit bar count so they fit neatly across the canvas
+                        const barCount = 100;
+                        const step = Math.max(1, Math.floor(bufferLength / barCount));
+                        const barWidth = visualizer.width / barCount;
+                        let x = 0;
+
+                        for (let i = 0; i < barCount; i++) {
+                            const value = dataArray[i * step];
+                            const barHeight = (value / 255) * visualizer.height * 0.8 + 6;
+
+                            const gradient = canvasCtx.createLinearGradient(0, visualizer.height - barHeight, 0, visualizer.height);
+                            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+                            gradient.addColorStop(1, 'rgba(255, 255, 255, 0.6)');
+
+                            canvasCtx.fillStyle = gradient;
+                            canvasCtx.fillRect(x, visualizer.height - barHeight, barWidth * 0.7, barHeight);
+
+                            x += barWidth;
+                        }
+
+                        animationId = requestAnimationFrame(animate);
+                    }
+                    
+                    animate();
+                })
+                .catch(err => {
+                    console.error('[Audio] Microphone permission denied or error:', err);
+                    alert('Microphone access is required for voice search.');
+                });
+        }
+
+        function stopRecording() {
+            if (!isRecording) {
+                return;
+            }
+
+            console.log('[Audio] Stopping recording...');
+            isRecording = false;
+
+            // Stop media recorder
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+
+            // Stop waveform animation
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+
+            // Stop microphone
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
+            if (microphone) {
+                microphone.disconnect();
+                microphone = null;
+            }
+
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            analyser = null;
+
+            // Hide visualizer and indicator
+            document.getElementById('audioVisualizer').style.display = 'none';
+            document.getElementById('recordingIndicator').style.display = 'none';
+
+            // Reset button
+            const voiceBtn = document.getElementById('voiceBtn');
+            voiceBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            voiceBtn.innerHTML = `
+                <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 1C10.34 1 9 2.34 9 4V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V4C15 2.34 13.66 1 12 1Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10M12 19V23M8 23H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Voice
+            `;
+        }
+
+        // Open Document Viewer
+        function viewDocument(filename) {
+            const modal = document.getElementById('documentViewerModal');
+            const frame = document.getElementById('documentFrame');
+            const title = document.getElementById('viewerTitle');
+            const downloadLink = document.getElementById('downloadLinkInViewer');
+
+            const fileUrl = `${API_BASE}/api/documents/${encodeURIComponent(filename)}/view`;
+            
+            title.textContent = filename;
+            downloadLink.href = `${API_BASE}/api/documents/${encodeURIComponent(filename)}/download`;
+            downloadLink.download = filename;
+            
+            // Load document in iframe (view mode, not download)
+            frame.src = fileUrl;
+            
+            modal.style.display = 'flex';
+        }
+
+        // Close Document Viewer
+        function closeDocumentViewer() {
+            const modal = document.getElementById('documentViewerModal');
+            const frame = document.getElementById('documentFrame');
+            modal.style.display = 'none';
+            frame.src = '';
+        }
+
+        // Initialize threshold slider
+        function initThresholdSlider() {
+            const slider = document.getElementById('thresholdSlider');
+            const thumb = document.getElementById('thresholdThumb');
+            const track = document.getElementById('thresholdTrack');
+            const valueDisplay = document.getElementById('thresholdValue');
+            
+            let isDragging = false;
+            
+            function updateSlider(clientX) {
+                const rect = slider.getBoundingClientRect();
+                const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+                const value = percent / 100;
+                
+                thresholdValue = value;
+                thumb.style.left = percent + '%';
+                track.style.width = percent + '%';
+                valueDisplay.textContent = (value * 100).toFixed(0) + '%';
+            }
+            
+            thumb.addEventListener('mousedown', () => isDragging = true);
+            document.addEventListener('mouseup', () => isDragging = false);
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) updateSlider(e.clientX);
+            });
+            slider.addEventListener('click', (e) => {
+                if (e.target !== thumb) updateSlider(e.clientX);
+            });
+            
+            // Initialize position
+            const initialPercent = thresholdValue * 100;
+            thumb.style.left = initialPercent + '%';
+            track.style.width = initialPercent + '%';
+            valueDisplay.textContent = (thresholdValue * 100).toFixed(0) + '%';
+        }
+
+        // Initialize max results slider
+        function initMaxResultsSlider() {
+            const slider = document.getElementById('maxResultsSlider');
+            const thumb = document.getElementById('maxResultsThumb');
+            const track = document.getElementById('maxResultsTrack');
+            const valueDisplay = document.getElementById('maxResultsValue');
+            
+            const minResults = 1;
+            const maxResultsLimit = 20;
+            let isDragging = false;
+            
+            function updateSlider(clientX) {
+                const rect = slider.getBoundingClientRect();
+                const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+                const value = Math.round(minResults + (percent / 100) * (maxResultsLimit - minResults));
+                
+                maxResults = value;
+                thumb.style.left = percent + '%';
+                track.style.width = percent + '%';
+                valueDisplay.textContent = value;
+            }
+            
+            thumb.addEventListener('mousedown', () => isDragging = true);
+            document.addEventListener('mouseup', () => isDragging = false);
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) updateSlider(e.clientX);
+            });
+            slider.addEventListener('click', (e) => {
+                if (e.target !== thumb) updateSlider(e.clientX);
+            });
+            
+            // Initialize position
+            const initialPercent = ((maxResults - minResults) / (maxResultsLimit - minResults)) * 100;
+            thumb.style.left = initialPercent + '%';
+            track.style.width = initialPercent + '%';
+            valueDisplay.textContent = maxResults;
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/stats?token=${encodeURIComponent(authToken)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    document.getElementById('stats').innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.total_documents || 0}</div>
+                            <div class="stat-label">Total Documents</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Handle Enter key in search box
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                search();
+            }
+        }
+
+        // Search function
+        async function search() {
+            const query = document.getElementById('searchQuery').value.trim();
+            const resultsDiv = document.getElementById('results');
+            const searchBtn = document.getElementById('searchBtn');
+            const aiSummaryBtn = document.getElementById('aiSummaryBtn');
+            
+            if (!query) {
+                resultsDiv.innerHTML = '<div class="no-results"><p>Please enter a search query</p></div>';
+                return;
+            }
+            
+            // Show loading
+            searchBtn.disabled = true;
+            resultsDiv.innerHTML = '<div class="loading">Searching documents...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/search?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: query,
+                        top_k: maxResults,
+                        threshold: thresholdValue
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.results && data.results.length > 0) {
+                    displayResults(data.results);
+                    aiSummaryBtn.style.display = 'inline-flex';
+                    window.currentResults = data.results;
+                    window.currentQuery = query;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="no-results">
+                            <img src="${API_BASE}/static/icons/${UI_TEXT.icons.search_x}" class="no-results-icon" alt="No results" onerror="this.style.display='none'">
+                            <h3>${UI_TEXT.no_results_title}</h3>
+                            <p>${UI_TEXT.no_results_message}</p>
+                        </div>
+                    `;
+                    aiSummaryBtn.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            } finally {
+                searchBtn.disabled = false;
+            }
+        }
+
+        // Display search results
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = `<div class="results-header"><h2>Found ${results.length} ${results.length === 1 ? ENTITY_NAME_SINGULAR : ENTITY_NAME}</h2></div>`;
+            
+            results.forEach((doc, index) => {
+                const excerpt = doc.text_excerpt || 'No preview available';
+                const filename = doc.filename || 'Unknown';
+                                const isDocx = filename.toLowerCase().endsWith('.docx') || filename.toLowerCase().endsWith('.doc');
+                
+                html += `
+                    <div class="result-card">
+                        <div class="result-header">
+                            <h3>
+                                <img src="${API_BASE}/static/icons/${UI_TEXT.icons.file}" class="icon" alt="File" onerror="this.style.display='none'">
+                                ${filename}
+                            </h3>
+                        </div>
+                        <div class="result-excerpt">${excerpt}</div>
+                        <div class="result-actions">
+                            ${!isDocx ? `<button onclick="viewDocument('${filename}')" class="action-btn view-btn">
+                                <img src="${API_BASE}/static/icons/${UI_TEXT.icons.eye}" class="icon" alt="View" onerror="this.style.display='none'">
+                                View
+                            </button>` : ''}
+                            <a href="${API_BASE}/api/documents/${encodeURIComponent(filename)}/download" class="action-btn" download>
+                                <img src="${API_BASE}/static/icons/${UI_TEXT.icons.download}" class="icon" alt="Download" onerror="this.style.display='none'">
+                                Download
+                            </a>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+            
+            // Auto-scroll to results
+            setTimeout(() => {
+                resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+
+        // Generate AI Summary
+        async function generateAISummary() {
+            if (!window.currentResults || !window.currentQuery) return;
+            
+            const resultsDiv = document.getElementById('results');
+            const aiSummaryBtn = document.getElementById('aiSummaryBtn');
+            
+            aiSummaryBtn.disabled = true;
+            
+            // Show loading in results
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'ai-summary loading';
+            loadingDiv.innerHTML = '<p>Generating AI summary...</p>';
+            resultsDiv.insertBefore(loadingDiv, resultsDiv.firstChild);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/summary?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: window.currentQuery,
+                        results: window.currentResults
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    loadingDiv.className = 'ai-summary';
+                    loadingDiv.innerHTML = `
+                        <h3>
+                            <img src="${API_BASE}/static/icons/${UI_TEXT.icons.sparkles}" alt="AI">
+                            ${UI_TEXT.summary_heading}
+                        </h3>
+                        <div class="summary-content">${data.summary}</div>
+                    `;
+                } else {
+                    loadingDiv.remove();
+                    alert('Error generating summary');
+                }
+            } catch (error) {
+                console.error('Summary error:', error);
+                loadingDiv.remove();
+                alert('Error generating summary');
+            } finally {
+                aiSummaryBtn.disabled = false;
+            }
+        }
+
+        // Refresh modal functions
+        function showRefreshConfirmation() {
+            document.getElementById('refreshModal').style.display = 'flex';
+        }
+
+        function closeRefreshModal() {
+            document.getElementById('refreshModal').style.display = 'none';
+        }
+
+        async function confirmRefresh() {
+            closeRefreshModal();
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">Refreshing index...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/refresh?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultsDiv.innerHTML = `<div class="success-message">${data.message}</div>`;
+                    loadStats();
+                } else {
+                    resultsDiv.innerHTML = `<div class="error">Error: ${data.error || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

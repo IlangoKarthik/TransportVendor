@@ -1,53 +1,32 @@
-import React, { useState } from 'react';
-import './App.css';
-import VendorForm from './components/VendorForm';
-import VendorList from './components/VendorList';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import './index.css';
+
+import Signup from './pages/auth/Signup';
+import Login from './pages/auth/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import Home from './pages/Home';
+import DocumentSearch from './pages/DocumentSearch';
+import DocumentUpload from './pages/DocumentUpload';
+import VendorSearch from './pages/VendorSearch';
+import VendorManagement from './pages/VendorManagement';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-  const [currentView, setCurrentView] = useState('list'); // 'list' or 'form'
-  const [editingVendorId, setEditingVendorId] = useState(null);
-
-  const handleAddNew = () => {
-    setEditingVendorId(null);
-    setCurrentView('form');
-  };
-
-  const handleEdit = (vendorId) => {
-    setEditingVendorId(vendorId);
-    setCurrentView('form');
-  };
-
-  const handleCancel = () => {
-    setEditingVendorId(null);
-    setCurrentView('list');
-  };
-
-  const handleSuccess = () => {
-    // After successful save/update, return to list view
-    setTimeout(() => {
-      setEditingVendorId(null);
-      setCurrentView('list');
-    }, 1500);
-  };
-
   return (
-    <div className={`App ${currentView === 'form' ? 'form-view' : ''}`}>
-      <div className={`container ${currentView === 'list' ? 'container-full-width' : ''}`}>
-        <header className="app-header">
-          <h1>Transport Vendor Management</h1>
-          <p>{currentView === 'list' ? 'View and manage all vendors' : 'Add or edit vendor details'}</p>
-        </header>
-        {currentView === 'list' ? (
-          <VendorList onEdit={handleEdit} onAddNew={handleAddNew} />
-        ) : (
-          <VendorForm 
-            vendorId={editingVendorId} 
-            onCancel={handleCancel}
-            onSuccess={handleSuccess}
-          />
-        )}
-      </div>
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        <Route path="/document-search" element={<ProtectedRoute><DocumentSearch /></ProtectedRoute>} />
+        <Route path="/document-upload" element={<ProtectedRoute><DocumentUpload /></ProtectedRoute>} />
+        <Route path="/vendor-search" element={<ProtectedRoute><VendorSearch /></ProtectedRoute>} />
+        <Route path="/vendor-management" element={<ProtectedRoute><VendorManagement /></ProtectedRoute>} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Router>
   );
 }
 

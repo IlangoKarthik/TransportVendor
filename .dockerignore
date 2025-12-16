@@ -1,0 +1,79 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+*.test.js
+*.spec.js
+
+# Data and uploads (should be in volumes)
+data/
+logs/
+uploads/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Build artifacts
+client/build/
+server/dist/
+
+# Documentation that's not needed in container
+*.md
+!README.md
+docs/
+
+# Git
+.git/
+.gitignore
+
+# Development scripts
+start.sh
+test_services.sh
+manage.sh
+.pids
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+.dockerignore
+Dockerfile.dev
+docker-compose.dev.yml

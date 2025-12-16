@@ -1,0 +1,543 @@
+"""
+Data Loader Module
+Handles loading vendor data from various sources (JSON, CSV, Excel, SQL Database, MongoDB)
+"""
+
+import json
+import pandas as pd
+from typing import List, Dict, Any, Optional
+import os
+
+
+class DataLoader:
+    """Load and validate vendor data from different sources"""
+    
+    def __init__(self, data_source: str = None, user_id: str = None):
+        """
+        Initialize DataLoader with data source path and optional user_id
+        
+        Args:
+            data_source: Path to data file (JSON, CSV, or Excel)
+            user_id: User ID for MongoDB filtering (if using MongoDB)
+        """
+        from config import DATA_TYPE
+        
+        # Try to import DATA_PATH for backward compatibility
+        try:
+            from config import DATA_PATH
+            self.data_source = data_source or DATA_PATH
+        except ImportError:
+            self.data_source = data_source or "data/vendors.json"
+        
+        self.data_type = DATA_TYPE.lower()
+        self.user_id = user_id
+    
+    def load_from_mongodb(self) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from MongoDB (vendor info only, no embeddings)
+        Flask db_search will generate its own embeddings and cache them locally
+        
+        Returns:
+            List of vendor dictionaries filtered by user_id with field names mapped to config format
+        """
+        try:
+            from pymongo import MongoClient
+            from bson import ObjectId
+        except ImportError:
+            raise ImportError("pymongo is required for MongoDB support. Install it with: pip install pymongo")
+        
+        # Get MongoDB connection details from environment
+        import os
+        mongo_uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/netkathir_ai_tool')
+        print(f"Connecting to MongoDB: {mongo_uri}")
+        
+        try:
+            # Connect to MongoDB
+            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+            # Test connection
+            client.admin.command('ping')
+            
+            db = client.get_database()
+            vendors_collection = db['vendors']
+            
+            # Query vendors for this user only
+            query = {}
+            if self.user_id:
+                # Convert string user_id to ObjectId for MongoDB query
+                try:
+                    query['userId'] = ObjectId(self.user_id)
+                except:
+                    # If conversion fails, use string (for backward compatibility)
+                    query['userId'] = self.user_id
+                print(f"Loading vendors for user: {self.user_id}")
+            else:
+                print("⚠️  No user_id provided - loading all vendors")
+            
+            # Exclude embedding and embeddingModel fields (Flask generates its own)
+            projection = {'embedding': 0, 'embeddingModel': 0}
+            vendors = list(vendors_collection.find(query, projection))
+            print(f"Loaded {len(vendors)} vendors from MongoDB")
+            
+            # MongoDB field name to config field name mapping
+            field_mapping = {
+                'transportName': 'transport_name',
+                'name': 'name',
+                'city': 'vendor_city',
+                'state': 'vendor_state',
+                'visitingCard': 'visiting_card',
+                'vehicleType': 'vehicle_type',
+                'mainServiceCity': 'main_service_city',
+                'ownerBroker': 'owner_broker',
+                'whatsappNumber': 'whatsapp_number',
+                'alternateNumber': 'alternate_number',
+                'mainServiceState': 'main_service_state',
+                'returnService': 'return_service',
+                'anyAssociation': 'any_association',
+                'associationName': 'association_name',
+                'verification': 'verification',
+                'notes': 'notes'
+            }
+            
+            # Convert MongoDB documents to config format
+            mapped_vendors = []
+            for vendor in vendors:
+                mapped_vendor = {}
+                
+                # Convert _id to string id
+                if '_id' in vendor:
+                    mapped_vendor['id'] = str(vendor['_id'])
+                
+                # Convert userId ObjectId to string
+                if 'userId' in vendor:
+                    mapped_vendor['userId'] = str(vendor['userId'])
+                
+                # Map all fields from MongoDB camelCase to config snake_case
+                for mongo_field, config_field in field_mapping.items():
+                    if mongo_field in vendor:
+                        value = vendor[mongo_field]
+                        
+                        # Special handling for notes array
+                        if mongo_field == 'notes' and isinstance(value, list):
+                            # Convert notes array to searchable text
+                            if value:
+                                notes_text = ' | '.join([
+                                    f"{note.get('comment', '')} [{note.get('timestamp', '')}]" 
+                                    for note in value if note.get('comment')
+                                ])
+                                mapped_vendor[config_field] = notes_text
+                                
+                                # Convert ObjectIds to strings in notes array for JSON serialization
+                                serializable_notes = []
+                                for note in value:
+                                    serializable_note = {}
+                                    for key, val in note.items():
+                                        if key == '_id' and hasattr(val, '__str__'):
+                                            # Convert ObjectId to string
+                                            serializable_note[key] = str(val)
+                                        else:
+                                            serializable_note[key] = val
+                                    serializable_notes.append(serializable_note)
+                                
+                                mapped_vendor['notes_raw'] = serializable_notes
+                            else:
+                                mapped_vendor[config_field] = ''
+                                mapped_vendor['notes_raw'] = []
+                        else:
+                            mapped_vendor[config_field] = value if value else ''
+                
+                # Add timestamps
+                if 'createdAt' in vendor:
+                    mapped_vendor['createdAt'] = str(vendor['createdAt'])
+                if 'updatedAt' in vendor:
+                    mapped_vendor['updatedAt'] = str(vendor['updatedAt'])
+                
+                mapped_vendors.append(mapped_vendor)
+            
+            client.close()
+            print(f"✓ Mapped {len(mapped_vendors)} vendors to config format")
+            return mapped_vendors
+            
+        except Exception as e:
+            print(f"✗ MongoDB connection error: {str(e)}")
+            raise
+        
+    def load_from_json(self, file_path: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from JSON file
+        
+        Args:
+            file_path: Path to JSON file
+            
+        Returns:
+            List of vendor dictionaries
+        """
+        path = file_path or self.data_source
+        
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Data file not found: {path}")
+        
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Handle both list and dict with 'vendors' key
+        if isinstance(data, dict) and 'vendors' in data:
+            return data['vendors']
+        elif isinstance(data, list):
+            return data
+        else:
+            return data
+    
+    def load_from_csv(self, file_path: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from CSV file
+        
+        Args:
+            file_path: Path to CSV file
+            
+        Returns:
+            List of vendor dictionaries
+        """
+        path = file_path or self.data_source
+        
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Data file not found: {path}")
+        
+        df = pd.read_csv(path)
+        
+        # Convert NaN to None for consistency
+        df = df.where(pd.notna(df), None)
+        
+        return df.to_dict('records')
+    
+    def load_from_excel(self, file_path: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from Excel file (.xlsx, .xls)
+        
+        Args:
+            file_path: Path to Excel file
+            
+        Returns:
+            List of vendor dictionaries
+        """
+        path = file_path or self.data_source
+        
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Data file not found: {path}")
+        
+        df = pd.read_excel(path)
+        
+        # Convert NaN to None for consistency
+        df = df.where(pd.notna(df), None)
+        
+        return df.to_dict('records')
+    
+    def load_from_sql(self, database_url: str = None, table_name: str = None) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from SQL database
+        
+        Args:
+            database_url: Database connection URL
+            table_name: Name of the table to load
+            
+        Returns:
+            List of vendor dictionaries
+        """
+        try:
+            from sqlalchemy import create_engine
+        except ImportError:
+            raise ImportError("sqlalchemy is required for SQL support. Install it with: pip install sqlalchemy")
+        
+        from config import SQL_DATABASE_URL, SQL_TABLE_NAME
+        
+        db_url = database_url or SQL_DATABASE_URL
+        table = table_name or SQL_TABLE_NAME
+        
+        # Create database connection
+        engine = create_engine(db_url)
+        
+        # Load data from table
+        query = f"SELECT * FROM {table}"
+        df = pd.read_sql(query, engine)
+        
+        # Convert NaN to None for consistency
+        df = df.where(pd.notna(df), None)
+        
+        return df.to_dict('records')
+    
+    def load_from_mysql(self) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from MySQL database using pure field index architecture
+        
+        Returns:
+            List of vendor dictionaries with field indices mapped to logical names
+        """
+        try:
+            import pymysql
+            from pymysql.cursors import DictCursor
+        except ImportError:
+            raise ImportError("pymysql is required for MySQL support. Install it with: pip install pymysql")
+        
+        from config import MYSQL_CONFIG, MYSQL_TABLE_NAME, FIELD_MAP, ACTIVE_FIELD_INDICES
+        
+        # Create MySQL connection
+        try:
+            connection = pymysql.connect(**MYSQL_CONFIG, cursorclass=DictCursor)
+        except pymysql.Error as e:
+            raise ConnectionError(f"Failed to connect to MySQL: {e}")
+        
+        try:
+            with connection.cursor() as cursor:
+                # Build SELECT query with all active field indices
+                field_columns = ", ".join([f"field_{i}" for i in ACTIVE_FIELD_INDICES])
+                query = f"SELECT id, {field_columns} FROM {MYSQL_TABLE_NAME}"
+                
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                
+                # Convert field indices to logical names using FIELD_MAP
+                vendors = []
+                for row in rows:
+                    vendor = {"id": row.get("id")}
+                    
+                    # Map field_0, field_1, ... to logical names
+                    for idx in ACTIVE_FIELD_INDICES:
+                        field_key = f"field_{idx}"
+                        field_value = row.get(field_key, "")
+                        
+                        # Get logical name from FIELD_MAP
+                        if idx in FIELD_MAP:
+                            logical_name = FIELD_MAP[idx]["name"]
+                            vendor[logical_name] = field_value if field_value else None
+                        
+                        # Also keep field index access for pure index operations
+                        vendor[f"field_{idx}"] = field_value if field_value else None
+                    
+                    vendors.append(vendor)
+                
+                return vendors
+                
+        finally:
+            connection.close()
+
+    def load_from_postgresql(self) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from PostgreSQL database
+        
+        Returns:
+            List of vendor dictionaries with all fields
+        """
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            from datetime import datetime
+        except ImportError:
+            raise ImportError("psycopg2 is required for PostgreSQL support. Install it with: pip install psycopg2-binary")
+        
+        from config import POSTGRESQL_CONFIG, POSTGRES_TABLE_NAME
+        
+        # Create PostgreSQL connection
+        try:
+            connection = psycopg2.connect(**POSTGRESQL_CONFIG, cursor_factory=RealDictCursor)
+        except psycopg2.Error as e:
+            raise ConnectionError(f"Failed to connect to PostgreSQL: {e}")
+        
+        try:
+            with connection.cursor() as cursor:
+                # Select all columns from the vendors table
+                query = f"SELECT * FROM {POSTGRES_TABLE_NAME}"
+                
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                
+                # Convert to list of dictionaries and process notes field
+                vendors = []
+                for row in rows:
+                    vendor = dict(row)
+                    
+                    # Process notes field - convert array of objects to searchable text with temporal context
+                    if 'notes' in vendor and vendor['notes']:
+                        notes_data = vendor['notes']
+                        
+                        # If notes is a list of objects with 'comment' and 'timestamp' fields
+                        if isinstance(notes_data, list):
+                            # Sort notes by timestamp (newest first) to prioritize recent comments
+                            sorted_notes = sorted(
+                                notes_data,
+                                key=lambda x: x.get('timestamp', ''),
+                                reverse=True
+                            )
+                            
+                            # Build searchable text with temporal indicators
+                            searchable_parts = []
+                            for idx, note in enumerate(sorted_notes):
+                                if isinstance(note, dict) and 'comment' in note:
+                                    comment = note['comment']
+                                    timestamp = note.get('timestamp', '')
+                                    
+                                    # Add temporal context for search
+                                    if idx == 0:
+                                        # Most recent comment - add emphasis
+                                        searchable_parts.append(f"RECENT: {comment}")
+                                    elif idx == len(sorted_notes) - 1:
+                                        # Oldest comment
+                                        searchable_parts.append(f"EARLIER: {comment}")
+                                    else:
+                                        # Middle comments
+                                        searchable_parts.append(comment)
+                                    
+                                    # Parse timestamp for additional context
+                                    try:
+                                        if timestamp:
+                                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                            # Add year/month context for very old/new comments
+                                            date_str = dt.strftime('%Y-%m')
+                                            searchable_parts.append(f"[{date_str}]")
+                                    except:
+                                        pass
+                            
+                            # Store original notes array (for display)
+                            vendor['notes_raw'] = notes_data
+                            
+                            # Store combined searchable text (for embeddings)
+                            vendor['notes'] = ' | '.join(searchable_parts) if searchable_parts else ''
+                            
+                            # Store count for stats
+                            vendor['notes_count'] = len(sorted_notes)
+                        else:
+                            vendor['notes'] = str(notes_data) if notes_data else ''
+                            vendor['notes_raw'] = []
+                            vendor['notes_count'] = 0
+                    else:
+                        vendor['notes'] = ''
+                        vendor['notes_raw'] = []
+                        vendor['notes_count'] = 0
+                    
+                    # Convert datetime objects to strings for JSON serialization
+                    if 'created_at' in vendor and vendor['created_at']:
+                        vendor['created_at'] = vendor['created_at'].isoformat()
+                    if 'updated_at' in vendor and vendor['updated_at']:
+                        vendor['updated_at'] = vendor['updated_at'].isoformat()
+                    
+                    vendors.append(vendor)
+                
+                return vendors
+                
+        finally:
+            connection.close()
+    
+    def load_from_dataframe(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """
+        Load vendor data from pandas DataFrame
+        
+        Args:
+            df: pandas DataFrame with vendor data
+            
+        Returns:
+            List of vendor dictionaries
+        """
+        return df.to_dict('records')
+    
+    def validate_data(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Validate and clean vendor data
+        
+        Args:
+            data: List of vendor dictionaries
+            
+        Returns:
+            Validated and cleaned data
+        """
+        from config import VENDOR_FIELDS
+        
+        validated_data = []
+        
+        for idx, record in enumerate(data):
+            # Ensure all required fields exist (fill with None if missing)
+            validated_record = {}
+            
+            for field in VENDOR_FIELDS:
+                validated_record[field] = record.get(field, None)
+            
+            # Keep the original ID if present
+            if 'id' in record:
+                validated_record['id'] = record['id']
+            else:
+                validated_record['id'] = idx + 1
+            
+            # Convert empty strings to None
+            for key, value in validated_record.items():
+                if value == "" or value == "null":
+                    validated_record[key] = None
+            
+            validated_data.append(validated_record)
+        
+        return validated_data
+    
+    def load(self, validate: bool = True) -> List[Dict[str, Any]]:
+        """
+        Load data from configured source (auto-detects format)
+        
+        Args:
+            validate: Whether to validate the data
+            
+        Returns:
+            List of vendor dictionaries
+        """
+        # Load based on DATA_TYPE config
+        if self.data_type == 'mongodb':
+            data = self.load_from_mongodb()
+            print(f"✓ Loaded {len(data)} vendors from MongoDB source")
+            return data
+        elif self.data_type == 'postgresql':
+            data = self.load_from_postgresql()
+            # PostgreSQL data is pre-validated with field mapping, skip legacy validation
+            print(f"✓ Loaded {len(data)} vendors from PostgreSQL source")
+            return data
+        elif self.data_type == 'mysql':
+            data = self.load_from_mysql()
+            # MySQL data is pre-validated with field mapping, skip legacy validation
+            print(f"✓ Loaded {len(data)} vendors from MySQL source")
+            return data
+        elif self.data_type == 'json' or self.data_source.endswith('.json'):
+            data = self.load_from_json()
+        elif self.data_type == 'csv' or self.data_source.endswith('.csv'):
+            data = self.load_from_csv()
+        elif self.data_type == 'excel' or self.data_source.endswith(('.xlsx', '.xls')):
+            data = self.load_from_excel()
+        elif self.data_type == 'sql':
+            data = self.load_from_sql()
+        else:
+            raise ValueError(f"Unsupported data type: {self.data_type} or file: {self.data_source}")
+        
+        if validate:
+            data = self.validate_data(data)
+        
+        print(f"✓ Loaded {len(data)} vendors from {self.data_type.upper()} source")
+        return data
+    
+    def get_sample_data(self, n: int = 5) -> List[Dict[str, Any]]:
+        """
+        Get a sample of vendor data
+        
+        Args:
+            n: Number of records to return
+            
+        Returns:
+            Sample of vendor data
+        """
+        data = self.load()
+        return data[:n]
+
+
+def load_vendors(data_source: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Convenience function to load vendor data
+    
+    Args:
+        data_source: Optional path to data file
+        
+    Returns:
+        List of vendor dictionaries
+    """
+    loader = DataLoader(data_source)
+    return loader.load()

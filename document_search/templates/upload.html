@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Documents - {{ ui.page_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.file_text) }}" class="icon-large" alt="Logo">
+                    Upload Documents
+                </h1>
+                <!-- Back to Search link handled by React navigation -->
+            </div>
+            <p class="subtitle">Upload and manage your document collection</p>
+        </header>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <img src="{{ url_for('static', filename='icons/' + ui.icons.upload) }}" class="upload-icon" alt="Upload" onerror="this.style.display='none'">
+                <h3>Drag & Drop Files Here</h3>
+                <p>or</p>
+                <label for="fileInput" class="upload-btn">Choose Files</label>
+                <input type="file" id="fileInput" multiple accept="{{ allowed_extensions }}" style="display: none;">
+                <p class="upload-info">
+                    Supported formats: {{ allowed_extensions }}<br>
+                    Max file size: {{ max_file_size_mb }} MB per file
+                </p>
+            </div>
+            <div id="uploadProgress" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p id="uploadStatus">Uploading...</p>
+            </div>
+        </div>
+
+        <!-- Documents List -->
+        <div class="documents-section">
+            <div class="section-header">
+                <h2>Uploaded Documents</h2>
+                <button onclick="loadDocuments()" class="refresh-btn-small">
+                    <img src="{{ url_for('static', filename='icons/' + ui.icons.refresh) }}" class="icon" alt="Refresh">
+                    Refresh
+                </button>
+            </div>
+            <div id="documentsList" class="documents-list">
+                <div class="loading">Loading documents...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Viewer Modal -->
+    <div class="modal-overlay" id="documentViewerModal">
+        <div class="modal-content document-viewer">
+            <div class="modal-header">
+                <h3 id="viewerTitle">Document Viewer</h3>
+                <button class="modal-close-btn" onclick="closeDocumentViewer()">×</button>
+            </div>
+            <div class="modal-body">
+                <iframe id="documentFrame" style="width: 100%; height: 70vh; border: none; border-radius: 10px;"></iframe>
+            </div>
+            <div class="modal-actions">
+                <a href="#" id="downloadLinkInViewer" class="modal-btn modal-btn-confirm" download>Download</a>
+                <button class="modal-btn modal-btn-cancel" onclick="closeDocumentViewer()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        const MAX_FILE_SIZE = {{ max_file_size_mb * 1024 * 1024 }};
+        
+        // Extract token from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const authToken = urlParams.get('token');
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDocuments();
+            initUpload();
+        });
+
+        // Initialize upload functionality
+        function initUpload() {
+            const uploadBox = document.getElementById('uploadBox');
+            const fileInput = document.getElementById('fileInput');
+
+            // File input change
+            fileInput.addEventListener('change', function(e) {
+                handleFiles(e.target.files);
+            });
+
+            // Drag and drop
+            uploadBox.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadBox.classList.add('dragover');
+            });
+
+            uploadBox.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                uploadBox.classList.remove('dragover');
+            });
+
+            uploadBox.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadBox.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            });
+        }
+
+        // Handle file selection
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+
+            // Validate files
+            const validFiles = [];
+            const errors = [];
+
+            for (let file of files) {
+                if (file.size > MAX_FILE_SIZE) {
+                    errors.push(`${file.name}: File too large`);
+                    continue;
+                }
+                validFiles.push(file);
+            }
+
+            if (errors.length > 0) {
+                alert('Some files were skipped:\n' + errors.join('\n'));
+            }
+
+            if (validFiles.length === 0) {
+                return;
+            }
+
+            // Upload files
+            await uploadFiles(validFiles);
+        }
+
+        // Upload files to server
+        async function uploadFiles(files) {
+            const formData = new FormData();
+            
+            for (let file of files) {
+                formData.append('files', file);
+            }
+
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const statusText = document.getElementById('uploadStatus');
+
+            progressDiv.style.display = 'block';
+            progressFill.style.width = '0%';
+            statusText.textContent = `Uploading ${files.length} file(s)...`;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/upload?token=${encodeURIComponent(authToken)}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    progressFill.style.width = '100%';
+                    statusText.textContent = `Successfully uploaded ${data.uploaded} file(s)`;
+                    
+                    // Reload documents list
+                    setTimeout(() => {
+                        progressDiv.style.display = 'none';
+                        loadDocuments();
+                        
+                        // Auto-scroll to documents list
+                        setTimeout(() => {
+                            const docsList = document.getElementById('documentsList');
+                            docsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 300);
+                    }, 2000);
+                } else {
+                    statusText.textContent = `Error: ${data.error}`;
+                    setTimeout(() => {
+                        progressDiv.style.display = 'none';
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                statusText.textContent = `Error: ${error.message}`;
+                setTimeout(() => {
+                    progressDiv.style.display = 'none';
+                }, 3000);
+            }
+
+            // Clear file input
+            document.getElementById('fileInput').value = '';
+        }
+
+        // Load documents list
+        async function loadDocuments() {
+            const listDiv = document.getElementById('documentsList');
+            listDiv.innerHTML = '<div class="loading">Loading documents...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/documents?token=${encodeURIComponent(authToken)}`);
+                const data = await response.json();
+
+                if (data.success && data.documents && data.documents.length > 0) {
+                    displayDocuments(data.documents);
+                } else {
+                    listDiv.innerHTML = `
+                        <div class="no-documents">
+                            <p>No documents uploaded yet</p>
+                            <p class="help-text">Upload your first document to get started!</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading documents:', error);
+                listDiv.innerHTML = `<div class="error">Error loading documents: ${error.message}</div>`;
+            }
+        }
+
+        // Display documents list
+        function displayDocuments(documents) {
+            const listDiv = document.getElementById('documentsList');
+            
+            let html = '';
+            documents.forEach((doc, index) => {
+                const filename = doc.filename || 'Unknown';
+                const sizeMB = doc.size_mb || 0;
+                const textLength = doc.text_length || 0;
+                const isDocx = filename.toLowerCase().endsWith('.docx') || filename.toLowerCase().endsWith('.doc');
+
+                html += `
+                    <div class="document-item">
+                        <div class="document-info">
+                            <img src="${API_BASE}/static/icons/{{ ui.icons.file }}" class="icon" alt="File" onerror="this.style.display='none'">
+                            <div class="document-details">
+                                <div class="document-name">${filename}</div>
+                                <div class="document-meta">${sizeMB.toFixed(2)} MB • ${textLength.toLocaleString()} characters</div>
+                            </div>
+                        </div>
+                        <div class="document-actions">
+                            ${!isDocx ? `<button onclick="viewDocument('${filename}')" class="action-btn-small view-btn" title="View">
+                                <img src="${API_BASE}/static/icons/{{ ui.icons.eye }}" class="icon" alt="View" onerror="this.style.display='none'">
+                            </button>` : ''}
+                            <a href="${API_BASE}/api/documents/${encodeURIComponent(filename)}/download" class="action-btn-small" download title="Download">
+                                <img src="${API_BASE}/static/icons/{{ ui.icons.download }}" class="icon" alt="Download" onerror="this.style.display='none'">
+                            </a>
+                            <button onclick="deleteDocument('${filename}')" class="action-btn-small delete-btn" title="Delete">
+                                <img src="${API_BASE}/static/icons/{{ ui.icons.trash }}" class="icon" alt="Delete" onerror="this.style.display='none'">
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            listDiv.innerHTML = html;
+        }
+
+        // View document
+        function viewDocument(filename) {
+            const modal = document.getElementById('documentViewerModal');
+            const frame = document.getElementById('documentFrame');
+            const title = document.getElementById('viewerTitle');
+            const downloadLink = document.getElementById('downloadLinkInViewer');
+
+            const fileUrl = `${API_BASE}/api/documents/${encodeURIComponent(filename)}/view?token=${encodeURIComponent(authToken)}`;
+            
+            title.textContent = filename;
+            downloadLink.href = `${API_BASE}/api/documents/${encodeURIComponent(filename)}/download?token=${encodeURIComponent(authToken)}`;
+            downloadLink.download = filename;
+            
+            // Load document in iframe (view mode, not download)
+            frame.src = fileUrl;
+            
+            modal.style.display = 'flex';
+        }
+
+        // Close Document Viewer
+        function closeDocumentViewer() {
+            const modal = document.getElementById('documentViewerModal');
+            const frame = document.getElementById('documentFrame');
+            modal.style.display = 'none';
+            frame.src = '';
+        }
+
+        // Delete document
+        async function deleteDocument(filename) {
+            if (!confirm(`Are you sure you want to delete "${filename}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/documents/${encodeURIComponent(filename)}?token=${encodeURIComponent(authToken)}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    loadDocuments();
+                } else {
+                    alert(`Error deleting document: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert(`Error deleting document: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
