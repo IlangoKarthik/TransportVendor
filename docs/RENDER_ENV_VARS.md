@@ -6,7 +6,7 @@ Add these to your Render service environment variables (NOT in a .env file):
 ```
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/netkathir_ai_tool
 JWT_SECRET=netkathir-super-secret-jwt-key-2024-production
-OPENAI_API_KEY=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
+OPENAI_API_KEY=...
 ```
 
 ## Important - Application Config
