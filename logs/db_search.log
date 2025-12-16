@@ -1,0 +1,10 @@
+✓ Response generator initialized successfully
+✓ OpenAI client initialized successfully
+✓ Ready for user-specific vendor searches
+============================================================
+🚀 Vendor DB Search API starting on port 5002...
+============================================================
+ * Serving Flask app 'api'
+ * Debug mode: on
+Address already in use
+Port 5002 is in use by another program. Either identify and stop that program, or start the server with a different port.

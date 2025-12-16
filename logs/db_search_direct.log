@@ -1,0 +1,23 @@
+✓ Response generator initialized successfully
+✓ OpenAI client initialized successfully
+============================================================
+🚀 Warehouse AI Search API
+============================================================
+
+API Endpoints:
+  POST   /api/search      - Search vendors
+  POST   /api/summary     - Generate AI summary
+  POST   /api/transcribe  - Transcribe audio (Whisper)
+  GET    /api/stats       - Get database stats
+  POST   /api/refresh     - Refresh search index
+  GET    /health          - Health check
+
+Frontend:
+  GET    /              - Main search interface
+
+============================================================
+
+ * Serving Flask app 'api'
+ * Debug mode: off
+Address already in use
+Port 5002 is in use by another program. Either identify and stop that program, or start the server with a different port.

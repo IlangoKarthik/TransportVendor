@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_CONFIG } from '../config/api';
 import './Pages.css';
 
 function VendorSearch() {
@@ -16,36 +15,11 @@ function VendorSearch() {
       return;
     }
 
-    // Check if Flask service is running with retry
-    let attempts = 0;
-    const maxAttempts = 3;
-    
-    const checkFlask = async () => {
-      try {
-        const url = `${API_CONFIG.DB_SEARCH_API}/health`;
-        console.log(`[Attempt ${attempts + 1}/${maxAttempts}] Checking Flask at:`, url);
-        const res = await fetch(url, { method: 'GET' });
-        console.log('Flask response status:', res.status);
-        if (res.ok) {
-          const data = await res.json();
-          console.log('Flask health:', data);
-          setFlaskReady(true);
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
-      } catch (err) {
-        console.error('Flask fetch error:', err);
-        attempts++;
-        if (attempts < maxAttempts) {
-          console.log(`Retrying in 2 seconds...`);
-          setTimeout(checkFlask, 2000);
-        } else {
-          setError(`Vendor Search service not available after ${maxAttempts} attempts. The service may still be starting up - please refresh in a moment.`);
-        }
-      }
-    };
-    
-    checkFlask();
+    // Check if Flask service is running
+    fetch(`http://localhost:5002/api/stats?token=${encodeURIComponent(token)}`)
+      .then(res => res.json())
+      .then(() => setFlaskReady(true))
+      .catch(err => setError('Vendor Search service not available. Please start Flask services.'));
   }, [token, navigate]);
 
   return (
@@ -68,7 +42,7 @@ function VendorSearch() {
 
       {flaskReady && (
         <iframe
-          src={`${API_CONFIG.DB_SEARCH_API}?token=${encodeURIComponent(token)}`}
+          src={`http://localhost:5002?token=${encodeURIComponent(token)}`}
           title="Vendor Search"
           allow="microphone"
           style={{

@@ -118,7 +118,7 @@ function Signup() {
             {error && <div className="error-message">{error}</div>}
             
             <div className="success-message">
-              OTP sent to {formData.email}.
+              OTP sent to {formData.email}. Please check your email.
             </div>
 
             <div className="form-group">
@@ -127,13 +127,10 @@ function Signup() {
                 type="text"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder="Enter OTP"
+                placeholder="6-digit OTP"
                 required
                 maxLength="6"
               />
-              <small style={{ color: '#667eea', marginTop: '8px', display: 'block', fontSize: '14px' }}>
-                <strong>Demo OTP:</strong> 1234
-              </small>
             </div>
 
             <button type="submit" disabled={loading} className="btn-primary">

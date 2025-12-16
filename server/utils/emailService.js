@@ -1,60 +1,20 @@
 const nodemailer = require('nodemailer');
 
-// Check if SMTP is configured
-const isEmailConfigured = () => {
-  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-};
-
-// Create transporter based on configuration
-const createTransporter = () => {
-  // For SendGrid API (recommended for Render)
-  if (process.env.SENDGRID_API_KEY) {
-    return nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      auth: {
-        user: 'apikey',
-        pass: process.env.SENDGRID_API_KEY
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000
-    });
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
   }
-  
-  // For standard SMTP (Gmail, etc.)
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000
-  });
-};
-
-const transporter = createTransporter();
+});
 
 const sendOTPEmail = async (email, otp, type) => {
-  // Check if email is configured
-  if (!isEmailConfigured()) {
-    console.warn('⚠️  SMTP not configured. Skipping email send. OTP:', otp);
-    // In development/testing, we'll return success but log the OTP
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`📧 [DEV MODE] OTP for ${email}: ${otp}`);
-      return true;
-    }
-    throw new Error('Email service not configured. Please contact administrator.');
-  }
-
   const subject = type === 'signup' ? 'Verify Your Email - Netkathir AI Tool' : 'Reset Your Password - Netkathir AI Tool';
   const message = type === 'signup'
-    ? `Your OTP for email verification is: <strong>${otp}</strong><br><br>This OTP will expire in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.`
-    : `Your OTP for password reset is: <strong>${otp}</strong><br><br>This OTP will expire in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.`;
+    ? `Your OTP for email verification is: <strong>${otp}</strong><br><br>This OTP will expire in ${process.env.OTP_EXPIRY_MINUTES} minutes.`
+    : `Your OTP for password reset is: <strong>${otp}</strong><br><br>This OTP will expire in ${process.env.OTP_EXPIRY_MINUTES} minutes.`;
 
   const mailOptions = {
     from: process.env.EMAIL_FROM,
@@ -98,17 +58,8 @@ const sendOTPEmail = async (email, otp, type) => {
     return true;
   } catch (error) {
     console.error(`✗ Email sending error: ${error.message}`);
-    console.error('Full error:', error);
-    
-    // Provide more specific error messages
-    if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
-      throw new Error('Cannot connect to email server. Please try again later.');
-    } else if (error.responseCode === 535) {
-      throw new Error('Email authentication failed. Please contact administrator.');
-    } else {
-      throw new Error('Failed to send OTP email. Please try again or contact support.');
-    }
+    throw new Error('Failed to send OTP email');
   }
 };
 
-module.exports = { sendOTPEmail, isEmailConfigured };
+module.exports = { sendOTPEmail };

@@ -51,9 +51,9 @@ router.post('/signup', async (req, res) => {
       }
     }
 
-    // Generate OTP (Demo mode: always use 1234)
-    const otp = '1234'; // Demo OTP for development
-    const expiresAt = new Date(Date.now() + parseInt(process.env.OTP_EXPIRY_MINUTES || 10) * 60 * 1000);
+    // Generate OTP
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + parseInt(process.env.OTP_EXPIRY_MINUTES) * 60 * 1000);
 
     // Save OTP to database
     await OTP.create({
@@ -63,24 +63,20 @@ router.post('/signup', async (req, res) => {
       expiresAt
     });
 
-    // Skip email sending in demo mode
-    console.log(`📧 [DEMO MODE] OTP for ${email}: ${otp}`);
+    // Send OTP email
+    await sendOTPEmail(email, otp, 'signup');
 
     // Store user data temporarily in session (we'll create the user after OTP verification)
     res.status(200).json({
       success: true,
       message: 'OTP sent to your email. Please verify to complete registration.',
       email,
-      userId,
-      demoOtp: '1234' // Send demo OTP in response for display
+      userId
     });
 
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ 
-      error: 'Server error during registration',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ error: 'Server error during registration' });
   }
 });
 
@@ -220,9 +216,9 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    // Generate OTP (Demo mode: always use 1234)
-    const otp = '1234'; // Demo OTP for development
-    const expiresAt = new Date(Date.now() + parseInt(process.env.OTP_EXPIRY_MINUTES || 10) * 60 * 1000);
+    // Generate OTP
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + parseInt(process.env.OTP_EXPIRY_MINUTES) * 60 * 1000);
 
     // Save OTP
     await OTP.create({
@@ -232,21 +228,17 @@ router.post('/forgot-password', async (req, res) => {
       expiresAt
     });
 
-    // Skip email sending in demo mode
-    console.log(`📧 [DEMO MODE] Password Reset OTP for ${user.email}: ${otp}`);
+    // Send OTP email
+    await sendOTPEmail(user.email, otp, 'reset-password');
 
     res.status(200).json({
       success: true,
-      message: 'OTP sent to your email',
-      demoOtp: '1234' // Send demo OTP in response for display
+      message: 'OTP sent to your email'
     });
 
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ 
-      error: 'Server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

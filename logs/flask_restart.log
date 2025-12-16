@@ -1,0 +1,19 @@
+
+> netkathir-ai-tool@2.0.0 flask
+> ./start-flask-services.sh
+
+================================================
+Starting Flask Microservices
+================================================
+🚀 Starting Document Search Service on port 5001...
+🚀 Starting Vendor DB Search Service on port 5002...
+
+✅ Flask services started!
+   📄 Document Search: http://localhost:5001
+   🏢 Vendor Search: http://localhost:5002
+
+📋 Process IDs: Document=24810, Vendor=24943
+📝 Logs: logs/document_search.log, logs/vendor_search.log
+
+To stop: ./stop-flask-services.sh
+================================================

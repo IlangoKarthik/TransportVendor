@@ -1,0 +1,9 @@
+✓ Document search ready
+✓ OpenAI client initialized successfully
+✓ User-specific document indexing enabled
+
+🚀 Document Search API starting on port 5001...
+ * Serving Flask app 'api'
+ * Debug mode: on
+Address already in use
+Port 5001 is in use by another program. Either identify and stop that program, or start the server with a different port.

@@ -27,36 +27,17 @@ user_search_engines = {}
 response_generator = None
 openai_client = None
 
-print("\n" + "="*60)
-print("DB Search API Starting Up")
-print("="*60)
-print(f"OPENAI_API_KEY set: {bool(config.OPENAI_API_KEY)}")
-print(f"Running in DEBUG mode: {config.API_DEBUG}")
-print("="*60 + "\n")
-
 def init_app():
     """Initialize response generator and OpenAI client on startup"""
     global response_generator, openai_client
     try:
-        if not config.OPENAI_API_KEY:
-            print("⚠️  WARNING: OPENAI_API_KEY not set. AI summarization will not work.")
-            print("  Set OPENAI_API_KEY environment variable to enable this feature.")
-            response_generator = None
-        else:
-            response_generator = ResponseGenerator()
-            print("✓ Response generator initialized successfully")
-        
-        if config.OPENAI_API_KEY:
-            openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
-            print("✓ OpenAI client initialized successfully")
-        else:
-            openai_client = None
-            print("⚠️  OpenAI client not initialized (API key missing)")
+        response_generator = ResponseGenerator()
+        openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
+        print("✓ Response generator initialized successfully")
+        print("✓ OpenAI client initialized successfully")
     except Exception as e:
-        print(f"⚠️  Error during initialization: {e}")
-        print("  App will continue running in limited mode")
-        response_generator = None
-        openai_client = None
+        print(f"✗ Error initializing: {e}")
+        raise
 
 def get_user_search_engine(user_id):
     """Get or create search engine for specific user"""
@@ -436,7 +417,7 @@ def health():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'service': 'db-search'
+        'search_engine': search_engine is not None
     })
 
 

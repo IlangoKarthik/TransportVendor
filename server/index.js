@@ -4,7 +4,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/database');
-const { createProxyMiddleware } = require('http-proxy-middleware');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -40,33 +39,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../data')));
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 
-// Flask Service Proxies (forward to local Flask services)
-// DB Search Service (port 5002)
-app.use('/flask/db-search', createProxyMiddleware({
-  target: 'http://localhost:5002',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/flask/db-search': ''
-  },
-  onError: (err, req, res) => {
-    console.error('DB Search proxy error:', err.message);
-    res.status(503).json({ error: 'DB Search service unavailable' });
-  }
-}));
-
-// Document Search Service (port 5001)
-app.use('/flask/doc-search', createProxyMiddleware({
-  target: 'http://localhost:5001',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/flask/doc-search': ''
-  },
-  onError: (err, req, res) => {
-    console.error('Document Search proxy error:', err.message);
-    res.status(503).json({ error: 'Document Search service unavailable' });
-  }
-}));
-
 // Health check
 app.get('/api/health', (req, res) => {
   res.status(200).json({
@@ -74,27 +46,6 @@ app.get('/api/health', (req, res) => {
     message: 'Server is running',
     timestamp: new Date().toISOString()
   });
-});
-
-// Flask health check endpoints
-app.get('/api/health/flask/db-search', async (req, res) => {
-  try {
-    const response = await fetch('http://localhost:5002/health');
-    const data = await response.json();
-    res.status(200).json({ service: 'db-search', healthy: true, ...data });
-  } catch (err) {
-    res.status(503).json({ service: 'db-search', healthy: false, error: err.message });
-  }
-});
-
-app.get('/api/health/flask/doc-search', async (req, res) => {
-  try {
-    const response = await fetch('http://localhost:5001/health');
-    const data = await response.json();
-    res.status(200).json({ service: 'doc-search', healthy: true, ...data });
-  } catch (err) {
-    res.status(503).json({ service: 'doc-search', healthy: false, error: err.message });
-  }
 });
 
 // Serve static files from React build (production)

@@ -1,5 +1,4 @@
 import api from './api';
-import { API_CONFIG } from '../config/api';
 
 export const getVendors = async () => {
   const response = await api.get('/vendors');
@@ -17,7 +16,7 @@ export const createVendor = async (data) => {
   // Refresh Flask cache after creating vendor
   try {
     const token = localStorage.getItem('token');
-    await fetch(`${API_CONFIG.DB_SEARCH_API}/api/refresh?token=${encodeURIComponent(token)}`, {
+    await fetch(`http://localhost:5002/api/refresh?token=${encodeURIComponent(token)}`, {
       method: 'POST'
     });
   } catch (error) {
@@ -33,7 +32,7 @@ export const updateVendor = async (id, data) => {
   // Refresh Flask cache after updating vendor
   try {
     const token = localStorage.getItem('token');
-    await fetch(`${API_CONFIG.DB_SEARCH_API}/api/refresh?token=${encodeURIComponent(token)}`, {
+    await fetch(`http://localhost:5002/api/refresh?token=${encodeURIComponent(token)}`, {
       method: 'POST'
     });
   } catch (error) {
@@ -49,7 +48,7 @@ export const deleteVendor = async (id) => {
   // Refresh Flask cache after deleting vendor
   try {
     const token = localStorage.getItem('token');
-    await fetch(`${API_CONFIG.DB_SEARCH_API}/api/refresh?token=${encodeURIComponent(token)}`, {
+    await fetch(`http://localhost:5002/api/refresh?token=${encodeURIComponent(token)}`, {
       method: 'POST'
     });
   } catch (error) {
@@ -86,10 +85,10 @@ export const generateEmbeddings = async () => {
     }
     
     console.log('🚀 Calling Flask refresh endpoint...');
-    console.log('📍 URL:', `${API_CONFIG.DB_SEARCH_API}/api/refresh`);
+    console.log('📍 URL: http://localhost:5002/api/refresh');
     console.log('🔑 Token (first 30 chars):', token.substring(0, 30) + '...');
     
-    const response = await fetch(`${API_CONFIG.DB_SEARCH_API}/api/refresh?token=${encodeURIComponent(token)}`, {
+    const response = await fetch(`http://localhost:5002/api/refresh?token=${encodeURIComponent(token)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -115,7 +114,7 @@ export const generateEmbeddings = async () => {
     console.error('💥 Error in generateEmbeddings:', error);
     
     if (error.message.includes('Failed to fetch')) {
-      throw new Error('Cannot connect to Flask server. Make sure Flask services are running.');
+      throw new Error('Cannot connect to Flask server. Make sure Flask is running on port 5002.');
     }
     
     throw error;

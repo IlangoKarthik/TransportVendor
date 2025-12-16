@@ -1,0 +1,12 @@
+
+> netkathir-server@2.0.0 start
+> node index.js
+
+
+==================================================
+✓ Server running on port 5003
+✓ Environment: development
+✓ Client URL: undefined
+==================================================
+
+✓ MongoDB Connected: localhost

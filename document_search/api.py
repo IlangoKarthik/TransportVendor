@@ -27,28 +27,15 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 user_search_engines = {}
 openai_client = None
 
-print("\n" + "="*60)
-print("Document Search API Starting Up")
-print("="*60)
-print(f"OPENAI_API_KEY set: {bool(config.OPENAI_API_KEY)}")
-print(f"Running in DEBUG mode: {config.API_DEBUG}")
-print("="*60 + "\n")
-
 def init_app():
     """Initialize OpenAI client on startup"""
     global openai_client
     try:
-        if not config.OPENAI_API_KEY:
-            print("⚠️  WARNING: OPENAI_API_KEY not set. Document summarization will not work.")
-            print("  Set OPENAI_API_KEY environment variable to enable this feature.")
-            openai_client = None
-        else:
-            openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
-            print("✓ OpenAI client initialized successfully")
+        openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
+        print("✓ OpenAI client initialized successfully")
     except Exception as e:
-        print(f"⚠️  Error initializing OpenAI client: {e}")
-        print("  App will continue running in limited mode")
-        openai_client = None
+        print(f"✗ Error initializing OpenAI client: {e}")
+        raise
 
 def get_user_search_engine(user_id):
     """Get or create search engine for specific user"""
@@ -635,15 +622,6 @@ Format: Start with "Here are your best matches:" then use natural paragraphs."""
     except Exception as e:
         print(f"Error generating summary: {e}")
         return "Unable to generate summary at this time."
-
-
-@app.route('/health', methods=['GET'])
-def health():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'service': 'document-search'
-    })
 
 
 if __name__ == '__main__':

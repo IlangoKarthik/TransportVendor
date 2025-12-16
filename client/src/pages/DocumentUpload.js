@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_CONFIG } from '../config/api';
 import './Pages.css';
 
 function DocumentUpload() {
@@ -16,32 +15,11 @@ function DocumentUpload() {
       return;
     }
 
-    // Check if Flask service is running with retry
-    let attempts = 0;
-    const maxAttempts = 3;
-    
-    const checkFlask = async () => {
-      try {
-        const url = `${API_CONFIG.DOC_SEARCH_API}/health`;
-        console.log(`[Attempt ${attempts + 1}/${maxAttempts}] Checking Flask at:`, url);
-        const res = await fetch(url, { method: 'GET' });
-        if (res.ok) {
-          setFlaskReady(true);
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
-      } catch (err) {
-        console.error('Flask fetch error:', err);
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(checkFlask, 2000);
-        } else {
-          setError(`Document Upload service not available after ${maxAttempts} attempts. The service may still be starting up - please refresh in a moment.`);
-        }
-      }
-    };
-    
-    checkFlask();
+    // Check if Flask service is running
+    fetch(`http://localhost:5001/api/stats?token=${encodeURIComponent(token)}`)
+      .then(res => res.json())
+      .then(() => setFlaskReady(true))
+      .catch(err => setError('Document Upload service not available. Please start Flask services.'));
   }, [token, navigate]);
 
   return (
@@ -64,7 +42,7 @@ function DocumentUpload() {
 
       {flaskReady && (
         <iframe
-          src={`${API_CONFIG.DOC_SEARCH_API}/upload?token=${encodeURIComponent(token)}`}
+          src={`http://localhost:5001/upload?token=${encodeURIComponent(token)}`}
           title="Document Upload"
           style={{
             width: '100%',

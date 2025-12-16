@@ -10,7 +10,7 @@ WORKDIR /app/client
 COPY client/package*.json ./
 
 # Install dependencies
-RUN npm install --legacy-peer-deps
+RUN npm ci
 
 # Copy client source
 COPY client/ ./
@@ -44,7 +44,7 @@ COPY server/package*.json ./server/
 
 # Install Node.js dependencies
 WORKDIR /app/server
-RUN npm install --only=production --legacy-peer-deps
+RUN npm ci --only=production
 
 # Copy server source
 WORKDIR /app
@@ -62,14 +62,15 @@ RUN mkdir -p /app/data/uploads /app/data/embeddings
 
 # Set environment
 ENV NODE_ENV=production
+ENV PORT=80
 
-# Expose port (Render will set PORT dynamically)
-EXPOSE 10000
+# Expose port
+EXPOSE 80
 
-# Health check (use PORT env var)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
-  CMD node -e "const p=process.env.PORT||10000;require('http').get(\`http://localhost:\${p}/api/health\`,(r)=>{process.exit(r.statusCode===200?0:1)})"
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
+  CMD node -e "require('http').get('http://localhost:80/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start all services (Node + Flask)
+# Start server
 WORKDIR /app/server
-CMD ["node", "start-all-services.js"]
+CMD ["node", "index.js"]
